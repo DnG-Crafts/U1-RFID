@@ -42,3 +42,11 @@ The tag format is a simple NDEF `application/json` record which is in the <a hre
 }
 
 ```
+
+## Official Snapmaker Tags
+
+The following document explains the format of the official snapmaker tags.<br>
+<a href=https://github.com/DnG-Crafts/U1-RFID/blob/main/docs/U1%20Tag%20Protocol.md>U1 Tag Protocol</a><br>
+
+Currently we can read and write to the MIFARE Classic 1K tags but we cant validate the data with a RSA signature due to the private key snapmaker uses.<br>
+We can bypass this signature check which requires firmware modification.
