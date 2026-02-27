@@ -1,0 +1,45 @@
+plugins {
+    alias(libs.plugins.android.application)
+}
+
+android {
+    namespace = 'dngsoftware.u1rfid'
+    defaultConfig {
+        resourceConfigurations += ['en']
+        applicationId = "dngsoftware.u1rfid"
+        minSdk = 21
+        compileSdkVersion = 36
+        targetSdk = 36
+        versionCode = 1
+        versionName = "1"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = true
+            shrinkResources = true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    buildFeatures {
+        viewBinding = true
+    }
+
+}
+
+dependencies {
+    implementation libs.appcompat.v161
+    implementation libs.material
+    implementation libs.activity.v108
+    implementation libs.constraintlayout.v214
+    implementation libs.room.runtime
+    implementation libs.documentfile
+    annotationProcessor libs.room.compiler
+    implementation libs.flexbox
+
+}
