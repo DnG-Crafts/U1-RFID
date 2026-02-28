@@ -38,7 +38,9 @@ import android.os.Looper;
 import android.text.InputFilter;
 import android.text.InputType;
 import android.text.SpannableString;
+import android.text.method.LinkMovementMethod;
 import android.text.style.ForegroundColorSpan;
+import android.text.util.Linkify;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.MenuItem;
@@ -69,6 +71,7 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
+import android.widget.TextView;
 import android.widget.Toast;
 import com.google.android.flexbox.FlexboxLayout;
 import com.google.android.material.navigation.NavigationView;
@@ -218,6 +221,11 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             }
             return false;
         });
+
+
+        if (!GetSetting(this, "firm_notice", false)) {
+            showFirmwareNotice();
+        }
 
     }
 
@@ -1331,9 +1339,9 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
 
     private void showImportDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        SpannableString titleText = new SpannableString("Import Database");
+        SpannableString titleText = new SpannableString(getString(R.string.import_database));
         titleText.setSpan(new ForegroundColorSpan(ContextCompat.getColor(this, R.color.primary_brand)), 0, titleText.length(), 0);
-        SpannableString messageText = new SpannableString("Restore database from file\n\nfilament_database.db");
+        SpannableString messageText = new SpannableString(getString(R.string.restore_database_from_file_filament_database_db));
         messageText.setSpan(new ForegroundColorSpan(ContextCompat.getColor(this, R.color.text_main)), 0, messageText.length(), 0);
         builder.setTitle(titleText);
         builder.setMessage(messageText);
@@ -1351,9 +1359,9 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
 
     private void showExportDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        SpannableString titleText = new SpannableString("Export Database");
+        SpannableString titleText = new SpannableString(getString(R.string.export_database));
         titleText.setSpan(new ForegroundColorSpan(ContextCompat.getColor(this, R.color.primary_brand)), 0, titleText.length(), 0);
-        SpannableString messageText = new SpannableString("Backup database to file\n\nfilament_database.db");
+        SpannableString messageText = new SpannableString(getString(R.string.backup_database_to_file_filament_database_db));
         messageText.setSpan(new ForegroundColorSpan(ContextCompat.getColor(this, R.color.text_main)), 0, messageText.length(), 0);
         builder.setTitle(titleText);
         builder.setMessage(messageText);
@@ -1469,7 +1477,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             tagDialog = new Dialog(this, R.style.Theme_U1RFID);
             tagDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
             tagDialog.setCanceledOnTouchOutside(false);
-            tagDialog.setTitle("Tag Memory");
+            tagDialog.setTitle(R.string.tag_memory);
             TagDialogBinding tdl = TagDialogBinding.inflate(getLayoutInflater());
             View rv = tdl.getRoot();
             tagDialog.setContentView(rv);
@@ -1542,4 +1550,40 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             }
         });
     }
+
+    private void showFirmwareNotice() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        SpannableString titleText = new SpannableString(getString(R.string.extended_firmware_required));
+        titleText.setSpan(new ForegroundColorSpan(ContextCompat.getColor(this, R.color.primary_brand)), 0, titleText.length(), 0);
+        SpannableString messageText = new SpannableString(String.format("%s\n\n%s\n\n", getString(R.string.extended_firmware_message), getString(R.string.extended_firmware_url)));
+        messageText.setSpan(new ForegroundColorSpan(ContextCompat.getColor(this, R.color.text_main)), 0, messageText.length(), 0);
+
+        builder.setTitle(titleText);
+        builder.setMessage(messageText);
+        builder.setCancelable(false);
+
+        builder.setPositiveButton(R.string.i_understand, (dialog, which) -> {
+            SaveSetting(this,"firm_notice",true);
+            dialog.dismiss();
+        });
+
+        builder.setNeutralButton(R.string.cancel, (dialog, which) -> dialog.dismiss());
+
+        AlertDialog cDialog = builder.create();
+        cDialog.show();
+
+        TextView messageView = cDialog.findViewById(android.R.id.message);
+        if (messageView != null) {
+            Linkify.addLinks(messageView, Linkify.WEB_URLS);
+            messageView.setMovementMethod(LinkMovementMethod.getInstance());
+            messageView.setLinkTextColor(ContextCompat.getColor(this, R.color.primary_variant));
+        }
+
+        if (cDialog.getWindow() != null) {
+            cDialog.getWindow().setBackgroundDrawableResource(R.color.background_alt);
+            cDialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(ContextCompat.getColor(this, R.color.primary_brand));
+            cDialog.getButton(AlertDialog.BUTTON_NEUTRAL).setTextColor(ContextCompat.getColor(this, R.color.primary_brand));
+        }
+    }
+
 }

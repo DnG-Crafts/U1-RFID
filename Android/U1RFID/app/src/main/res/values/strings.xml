@@ -120,4 +120,13 @@
     <string name="tag_capacity_too_small">Tag capacity too small</string>
     <string name="filament_not_found_in_db">Filament not found in db</string>
     <string name="application_json">application/json</string>
+    <string name="extended_firmware_url">https://github.com/paxx12/SnapmakerU1-Extended-Firmware</string>
+    <string name="extended_firmware_message">You must install the extended firmware to the U1 for tags written by this app to work.\n\nYou can obtain the extended firmware from</string>
+    <string name="i_understand">I Understand</string>
+    <string name="extended_firmware_required">Extended Firmware Required</string>
+    <string name="tag_memory">Tag Memory</string>
+    <string name="import_database">Import Database</string>
+    <string name="restore_database_from_file_filament_database_db">Restore database from file\n\nfilament_database.db</string>
+    <string name="export_database">Export Database</string>
+    <string name="backup_database_to_file_filament_database_db">Backup database to file\n\nfilament_database.db</string>
 </resources>
