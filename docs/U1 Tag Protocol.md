@@ -19,7 +19,7 @@ These files are all located in the firmware at `\home\lava\klipper\klippy\extras
 
 The tag security is built on three distinct layers:
 1.  **Unique Key Derivation**: Every physical tag has 32 unique keys (16x Key A, 16x Key B) generated from its unique hardware ID (UID).
-2.  **Access Control**: A specific access bit pattern (`0x87878769`) defines permissions for each sector.
+2.  **Access Control**: A specific access bit pattern (`0x87 0x87 0x87 0x69`) defines permissions for each sector.
 3.  **RSA Signature**: A 256-byte digital signature ensures that the filament data (weight, color, type) has not been tampered with.
 
 <br><br>
@@ -30,7 +30,7 @@ The tag security is built on three distinct layers:
 
 ## 2. Key Derivation Function (KDF)
 
-The printer does not use default keys (like `FFFFFFFFFFFF`). Instead, it derives keys using the **HMAC-SHA256** algorithm. <br>
+The printer does not use default keys (like `0xFF 0xFF 0xFF 0xFF 0xFF 0xFF`). Instead, it derives keys using the **HMAC-SHA256** algorithm. <br>
 This ensures that you cannot simply "copy-paste" data from one tag to another, as the destination tag will have a different UID and therefore require different keys.
 
 ### The Extraction Phase (Master Key)
@@ -44,7 +44,7 @@ First, a **Pseudo-Random Key (PRK)** is extracted by hashing the tag's UID with 
 ### The Expansion Phase (Sector Keys)
 The PRK is then used to generate 16 individual sector keys. For each sector ($i$ from 0 to 15), the following is performed:
 
-1.  **Context String**: A string is built: `key_a_` + `sector` (e.g., `"key_a_0"`, `"key_a_1"`...).
+1.  **Context String**: A string is built: `key_a_` + `sector` (e.g., `"key_a_0"`, `"key_a_1"`... `"key_b_0"`, `"key_b_1"`...).
 2.  **Hashing**: The PRK, the Context String, and a constant byte `0x01` are hashed together.
 3.  **Truncation**: The first 6 bytes of the resulting 32-byte hash become the actual MIFARE key.
 
@@ -71,7 +71,7 @@ The tag is organized into 16 sectors. Each sector contains 3 data blocks and 1 t
 ### The Sector Trailer (Block 3)
 Each sector's security is defined in the last block of that sector:
 * **Bytes 0-5**: Derived Key A
-* **Bytes 6-9**: Access Bits (`87 87 87 69`)
+* **Bytes 6-9**: Access Bits (`0x87 0x87 0x87 0x69`)
 * **Bytes 10-15**: Derived Key B
 
 <br><br>
@@ -116,7 +116,7 @@ def verify_signature_pkcs1(public_key, data, signature):
         return False
 ```
 
-The following change would bypass the RSA signature check allowing the data on the tag to be read without needing to signed.
+The following change would bypass the RSA signature check allowing both signed and unsigned tags to be read.
 
 ```
 def verify_signature_pkcs1(public_key, data, signature):
