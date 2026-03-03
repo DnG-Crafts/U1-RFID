@@ -2,11 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <uses-feature android:name="android.hardware.nfc" android:required="true" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application
+        android:networkSecurityConfig="@xml/nsc"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher_foreground"
         android:label="@string/app_name"

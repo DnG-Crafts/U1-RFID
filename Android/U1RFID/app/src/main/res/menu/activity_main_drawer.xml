@@ -6,10 +6,9 @@
     <item android:title="@string/app">
         <menu>
             <item
-                android:id="@+id/nav_dark"
-                android:icon="@drawable/twotone_dark_mode_24"
-                android:title="@string/dark_mode"
-                app:actionLayout="@layout/switch_item" />
+                android:id="@+id/nav_settings"
+                android:icon="@drawable/twotone_settings_24"
+                android:title="@string/open_settings" />
         </menu>
     </item>
     <item android:title="@string/app_database">
@@ -40,16 +39,6 @@
                 android:id="@+id/nav_memory"
                 android:icon="@drawable/twotone_memory_24"
                 android:title="@string/read_tag_memory" />
-        </menu>
-    </item>
-
-    <item android:title="@string/nfc_functions">
-        <menu>
-            <item
-                android:id="@+id/nav_launch"
-                android:icon="@drawable/twotone_nfc_24"
-                android:title="@string/launch_app"
-                app:actionLayout="@layout/switch_item" />
         </menu>
     </item>
 </menu>

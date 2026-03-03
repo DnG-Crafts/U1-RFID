@@ -4,6 +4,8 @@ import static android.view.View.TEXT_ALIGNMENT_CENTER;
 import dngsoftware.u1rfid.databinding.ActivityMainBinding;
 import dngsoftware.u1rfid.databinding.AddDialogBinding;
 import dngsoftware.u1rfid.databinding.PickerDialogBinding;
+import dngsoftware.u1rfid.databinding.SettingsDialogBinding;
+import dngsoftware.u1rfid.databinding.SpoolDialogBinding;
 import dngsoftware.u1rfid.databinding.TagDialogBinding;
 import static dngsoftware.u1rfid.FilamentRegistry.filamentTypes;
 import static dngsoftware.u1rfid.FilamentRegistry.filamentVendors;
@@ -11,6 +13,7 @@ import static dngsoftware.u1rfid.Utils.*;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Dialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
@@ -74,14 +77,21 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.google.android.flexbox.FlexboxLayout;
+import com.google.android.material.datepicker.MaterialDatePicker;
 import com.google.android.material.navigation.NavigationView;
+import com.google.android.material.tabs.TabLayout;
+import com.google.android.material.textfield.TextInputEditText;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -92,8 +102,9 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     Tag currentTag = null;
     int tagType;
     ArrayAdapter<String> sadapter;
+    ColorMatcher matcher = null;
     String MaterialID, MaterialWeight = "1 KG", MaterialColor = "FF0000FF";
-    Dialog pickerDialog, addDialog, tagDialog;
+    Dialog pickerDialog, addDialog, tagDialog, settingsDialog, spoolDialog;;
     AlertDialog inputDialog;
     tagAdapter recycleAdapter;
     RecyclerView recyclerView;
@@ -103,6 +114,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     boolean userSelect = false;
     private ActivityMainBinding main;
     Bitmap gradientBitmap;
+    Context context;
     private ExecutorService executorService;
     private Handler mainHandler;
     private ActivityResultLauncher<Intent> exportDirectoryChooser;
@@ -120,6 +132,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        context = this;
         setThemeMode(GetSetting(this, "enabledm", false));
         Resources res = getApplicationContext().getResources();
         Locale locale = new Locale("en");
@@ -143,27 +156,11 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         navigationView = findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
-        MenuItem launchItem = navigationView.getMenu().findItem(R.id.nav_launch);
-        SwitchCompat launchSwitch = Objects.requireNonNull(launchItem.getActionView()).findViewById(R.id.drawer_switch);
-        launchSwitch.setChecked(GetSetting(this, "autoLaunch", true));
-        launchSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            setNfcLaunchMode(this, isChecked);
-            SaveSetting(this, "autoLaunch", isChecked);
-        });
-
         MenuItem readItem = navigationView.getMenu().findItem(R.id.nav_read);
         SwitchCompat readSwitch = Objects.requireNonNull(readItem.getActionView()).findViewById(R.id.drawer_switch);
         readSwitch.setChecked(GetSetting(this, "autoread", false));
         readSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             SaveSetting(this, "autoread", isChecked);
-        });
-
-        MenuItem darkItem = navigationView.getMenu().findItem(R.id.nav_dark);
-        SwitchCompat darkSwitch = Objects.requireNonNull(darkItem.getActionView()).findViewById(R.id.drawer_switch);
-        darkSwitch.setChecked(GetSetting(this, "enabledm", false));
-        darkSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            SaveSetting(this, "enabledm", isChecked);
-            setThemeMode(isChecked);
         });
 
         main.colorview.setOnClickListener(view -> openPicker());
@@ -227,6 +224,24 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             showFirmwareNotice();
         }
 
+        if (GetSetting(context, "enablesm", false))
+        {
+            main.smbutton.setVisibility(View.VISIBLE);
+            executorService.execute(() -> matcher = new ColorMatcher(context));
+        }
+        else {
+            main.smbutton.setVisibility(View.INVISIBLE);
+        }
+        main.smbutton.setOnClickListener(view ->
+        {
+            if (GetSetting(context, "enablesm", false))
+            {
+                openSpoolAdd();
+            }
+        });
+
+
+
     }
 
 
@@ -257,35 +272,34 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
 
     void setMatDb() {
         try {
-        if (rdb != null && rdb.isOpen()) {
-            rdb.close();
-        }
+            if (rdb != null && rdb.isOpen()) {
+                rdb.close();
+            }
 
-        rdb = filamentDB.getInstance(this);
-        matDb = rdb.matDB();
+            rdb = filamentDB.getInstance(this);
+            matDb = rdb.matDB();
 
-        if (matDb.getItemCount() == 0) {
-            populateDatabase(matDb);
-        }
+            if (matDb.getItemCount() == 0) {
+                populateDatabase(matDb);
+            }
 
-        mainHandler.post(() -> {
-            sadapter = new ArrayAdapter<>(this, R.layout.spinner_item, materialWeights);
-            main.spoolsize.setAdapter(sadapter);
-            main.spoolsize.setSelection(SelectedSize);
-            main.spoolsize.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                @Override
-                public void onItemSelected(AdapterView<?> parentView, View selectedItemView, int position, long id) {
-                    SelectedSize = main.spoolsize.getSelectedItemPosition();
-                    MaterialWeight = sadapter.getItem(position);
-                }
+            mainHandler.post(() -> {
+                sadapter = new ArrayAdapter<>(this, R.layout.spinner_item, materialWeights);
+                main.spoolsize.setAdapter(sadapter);
+                main.spoolsize.setSelection(SelectedSize);
+                main.spoolsize.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                    @Override
+                    public void onItemSelected(AdapterView<?> parentView, View selectedItemView, int position, long id) {
+                        SelectedSize = main.spoolsize.getSelectedItemPosition();
+                        MaterialWeight = sadapter.getItem(position);
+                    }
 
-                @Override
-                public void onNothingSelected(AdapterView<?> parentView) {
-                }
+                    @Override
+                    public void onNothingSelected(AdapterView<?> parentView) {
+                    }
+                });
+                loadMaterials();
             });
-
-            loadMaterials();
-        });
         } catch (Exception ignored) {}
     }
 
@@ -302,11 +316,26 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             } catch (Exception ignored) {
             }
         }
+        if (rdb != null && rdb.isOpen()) {
+            rdb.close();
+        }
         if (pickerDialog != null && pickerDialog.isShowing()) {
             pickerDialog.dismiss();
         }
         if (inputDialog != null && inputDialog.isShowing()) {
             inputDialog.dismiss();
+        }
+        if (spoolDialog != null && spoolDialog.isShowing()) {
+            spoolDialog.dismiss();
+        }
+        if (settingsDialog != null && settingsDialog.isShowing()) {
+            settingsDialog.dismiss();
+        }
+        if (addDialog != null && addDialog.isShowing()) {
+            addDialog.dismiss();
+        }
+        if (tagDialog != null && tagDialog.isShowing()) {
+            tagDialog.dismiss();
         }
     }
 
@@ -325,6 +354,25 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
 
 
     @Override
+    public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+        int id = item.getItemId();
+        if (id == R.id.nav_export) {
+            showExportDialog();
+        }else if (id == R.id.nav_import) {
+            showImportDialog();
+        }else if (id == R.id.nav_format) {
+            formatTag(currentTag);
+        } else if (id == R.id.nav_memory) {
+            loadTagMemory();
+        }else if (id == R.id.nav_settings) {
+            openSettings();
+        }
+        drawerLayout.closeDrawer(GravityCompat.START);
+        return true;
+    }
+
+
+    @Override
     public void onTagDiscovered(Tag tag) {
         try {
             mainHandler.post(() -> {
@@ -334,18 +382,18 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     showToast(getString(R.string.tag_found) + bytesToHex(uid, false), Toast.LENGTH_SHORT);
                     tagType = getTagType(NfcA.get(currentTag));
                     main.tagid.setText(bytesToHex(uid, true));
+                    main.tagid.setVisibility(View.VISIBLE);
                     if (tagType == 100 || tagType == 213) {
                         showToast(getString(R.string.incompatible_tag), Toast.LENGTH_SHORT);
                     }
-                    main.lbltagid.setVisibility(View.VISIBLE);
                     if (GetSetting(this, "autoread", false)) {
                         readTag(currentTag);
                     }
                 }
                 else {
                     currentTag = null;
+                    main.tagid.setVisibility(View.INVISIBLE);
                     main.tagid.setText("");
-                    main.lbltagid.setVisibility(View.INVISIBLE);
                     showToast(R.string.invalid_tag_type, Toast.LENGTH_SHORT);
                 }
             });
@@ -407,6 +455,10 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                             JSONObject json = new JSONObject(f.filamentParam);
                             if (json.optString("brand").equals(main.brand.getSelectedItem().toString()) && json.optString("type").equals(main.type.getSelectedItem().toString()) && json.optString("subtype").equals(sub)) {
                                 MaterialID = json.optString("id");
+                                main.extMax.setText(String.format(Locale.getDefault(),"%d°C", json.optInt("max_temp")));
+                                main.extMin.setText(String.format(Locale.getDefault(),"%d°C", json.optInt("min_temp")));
+                                main.bedMax.setText(String.format(Locale.getDefault(),"%d°C", json.optInt("bed_max_temp")));
+                                main.bedMin.setText(String.format(Locale.getDefault(),"%d°C", json.optInt("bed_min_temp")));
                                 break;
                             }
                         } catch (Exception ignored) {
@@ -1440,23 +1492,6 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     }
 
 
-    @Override
-    public boolean onNavigationItemSelected(@NonNull MenuItem item) {
-        int id = item.getItemId();
-        if (id == R.id.nav_export) {
-            showExportDialog();
-        }else if (id == R.id.nav_import) {
-            showImportDialog();
-        }else if (id == R.id.nav_format) {
-            formatTag(currentTag);
-        } else if (id == R.id.nav_memory) {
-            loadTagMemory();
-        }
-        drawerLayout.closeDrawer(GravityCompat.START);
-        return true;
-    }
-
-
     private void showToast(final Object content, final int duration) {
         mainHandler.post(() -> {
             if (currentToast != null) currentToast.cancel();
@@ -1584,6 +1619,292 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             cDialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(ContextCompat.getColor(this, R.color.primary_brand));
             cDialog.getButton(AlertDialog.BUTTON_NEUTRAL).setTextColor(ContextCompat.getColor(this, R.color.primary_brand));
         }
+    }
+
+
+
+    void openSpoolAdd() {
+        spoolDialog = new Dialog(context, R.style.Theme_U1RFID);
+        spoolDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        spoolDialog.setCanceledOnTouchOutside(false);
+        spoolDialog.setTitle(R.string.add_spool_to_spoolman);
+        SpoolDialogBinding sdl = SpoolDialogBinding.inflate(getLayoutInflater());
+        View rv = sdl.getRoot();
+        spoolDialog.setContentView(rv);
+
+        sdl.btncls.setOnClickListener(v -> {
+            hideKeyboard(v);
+            spoolDialog.dismiss();
+        });
+
+        sdl.containerVendor.setVisibility(View.VISIBLE);
+        sdl.containerFilament.setVisibility(View.GONE);
+        sdl.containerSpool.setVisibility(View.GONE);
+
+        sdl.tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+            @Override
+            public void onTabSelected(TabLayout.Tab tab) {
+                hideKeyboard(sdl.tabLayout);
+                sdl.containerVendor.setVisibility(View.GONE);
+                sdl.containerFilament.setVisibility(View.GONE);
+                sdl.containerSpool.setVisibility(View.GONE);
+                switch (tab.getPosition()) {
+                    case 0:
+                        sdl.containerVendor.setVisibility(View.VISIBLE);
+                        break;
+                    case 1:
+                        sdl.containerFilament.setVisibility(View.VISIBLE);
+                        break;
+                    case 2:
+                        sdl.containerSpool.setVisibility(View.VISIBLE);
+                        break;
+                }
+            }
+
+            @Override
+            public void onTabUnselected(TabLayout.Tab tab) {}
+
+            @Override
+            public void onTabReselected(TabLayout.Tab tab) {}
+        });
+
+        View.OnClickListener dateListener = v -> {
+            TextInputEditText target = (TextInputEditText) v;
+            MaterialDatePicker<Long> picker = MaterialDatePicker.Builder.datePicker()
+                    .setTitleText("Select Date")
+                    .build();
+            picker.addOnPositiveButtonClickListener(selection -> {
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
+                sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+                target.setText(sdf.format(new Date(selection)));
+            });
+            picker.show(getSupportFragmentManager(), "DATE_PICKER");
+        };
+
+        sdl.sFirstUsed.setOnClickListener(dateListener);
+        sdl.sLastUsed.setOnClickListener(dateListener);
+
+        sdl.containerMain.setOnClickListener(v -> hideKeyboard(sdl.containerMain));
+        sdl.containerButton.setOnClickListener(v -> hideKeyboard(sdl.containerButton));
+
+        sdl.vComment.setText(String.format("Created by %s", context.getString(R.string.app_name)));
+        sdl.fComment.setText(String.format("Created by %s", context.getString(R.string.app_name)));
+        sdl.sComment.setText(R.string.rfid_tagged_for_snapmaker_u1);
+
+        Filament localData = matDb.getFilamentById(MaterialID);
+
+        if (localData.filamentParam != null && !localData.filamentParam.isEmpty()) {
+            try {
+                OpenSpoolFilament osf = new OpenSpoolFilament(localData.filamentParam);
+                sdl.fMaterial.setText(osf.getType());
+                sdl.fDiameter.setText(String.valueOf(osf.getDiameter()));
+                sdl.fTempExtruder.setText(String.valueOf(osf.getMaxTemp()));
+                sdl.fTempBed.setText(String.valueOf(osf.getBedMaxTemp()));
+                sdl.vName.setText(osf.getBrand());
+                sdl.fMaterial.setText(osf.getSubType());
+                sdl.fDensity.setText(GetMaterialDensity(osf.getType()));
+            } catch (Exception ignored) {
+            }
+        }else {
+            showToast(getString(R.string.filament_not_found_in_db), Toast.LENGTH_SHORT);
+            return;
+        }
+
+        sdl.sRemainingWeight.setText(String.format(Locale.getDefault(), "%d", Utils.GetMaterialIntWeight(MaterialWeight)));
+        sdl.sInitialWeight.setText(String.format(Locale.getDefault(), "%d", Utils.GetMaterialIntWeight(MaterialWeight)));
+        sdl.fColorHex.setText(MaterialColor.substring(2));
+        sdl.fExternalId.setText(MaterialID);
+        String colorName = matcher.findNearestColor(MaterialColor.substring(2));
+        if (colorName == null || colorName.isEmpty())
+        {
+            colorName = MaterialColor.substring(2);
+        }
+        sdl.fName.setText(String.format("%s (%s)", sdl.fMaterial.getText(), colorName));
+        String[] directions = new String[] {"coaxial", "longitudinal"};
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(context, android.R.layout.simple_dropdown_item_1line, directions);
+        sdl.fMultiColorDirection.setAdapter(adapter);
+
+        sdl.btnadd.setOnClickListener(v -> {
+            hideKeyboard(v);
+            String smHost = GetSetting(context, "smhost", "");
+            int smPort = GetSetting(context, "smport", 7912);
+
+            if (!smHost.isEmpty()) {
+                String baseUrl = "http://" + smHost + ":" + smPort + "/api/v1";
+
+                executorService.execute(() -> {
+                    try {
+                        String vendorName = Objects.requireNonNull(sdl.vName.getText()).toString().trim();
+                        int vendorId = -1;
+                        String vRes = performSmRequest(context, baseUrl + "/vendor", "GET", null);
+
+                        if (vRes != null) {
+                            JSONArray vArray = new JSONArray(vRes);
+                            for (int i = 0; i < vArray.length(); i++) {
+                                JSONObject vo = vArray.getJSONObject(i);
+                                if (vo.getString("name").equalsIgnoreCase(vendorName)) {
+                                    vendorId = vo.getInt("id");
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (vendorId == -1) {
+                            JSONObject vBody = new JSONObject();
+                            vBody.put("name", vendorName);
+                            vBody.put("comment", Objects.requireNonNull(sdl.vComment.getText()).toString());
+                            vBody.put("empty_spool_weight", getDoubleOrNull(sdl.vEmptySpoolWeight));
+                            vBody.put("external_id", Objects.requireNonNull(sdl.vExternalId.getText()).toString());
+                            String newV = performSmRequest(context, baseUrl + "/vendor", "POST", vBody.toString());
+                            if (newV != null) vendorId = new JSONObject(newV).getInt("id");
+                        }
+
+                        String filamentName = Objects.requireNonNull(sdl.fName.getText()).toString().trim();
+                        int filamentId = -1;
+                        String fRes = performSmRequest(context, baseUrl + "/filament", "GET", null);
+
+
+                        if (fRes != null) {
+                            JSONArray fArray = new JSONArray(fRes);
+                            for (int i = 0; i < fArray.length(); i++) {
+                                JSONObject f = fArray.getJSONObject(i);
+                                int vIdCheck = f.has("vendor") && !f.isNull("vendor") ? f.getJSONObject("vendor").getInt("id") : -1;
+                                if (vIdCheck == vendorId && f.getString("name").equalsIgnoreCase(filamentName)) {
+                                    filamentId = f.getInt("id");
+                                    break;
+                                }
+                            }
+                        }
+
+
+                        if (filamentId == -1) {
+                            JSONObject fBody = new JSONObject();
+                            fBody.put("name", filamentName);
+                            fBody.put("vendor_id", vendorId);
+                            fBody.put("material", Objects.requireNonNull(sdl.fMaterial.getText()).toString());
+                            fBody.put("price", getDoubleOrNull(sdl.fPrice));
+                            fBody.put("density", getDoubleOrNull(sdl.fDensity));
+                            fBody.put("diameter", getDoubleOrNull(sdl.fDiameter));
+                            fBody.put("weight", getDoubleOrNull(sdl.fWeight));
+                            fBody.put("spool_weight", getDoubleOrNull(sdl.fSpoolWeight));
+                            fBody.put("article_number", Objects.requireNonNull(sdl.fArticleNumber.getText()).toString());
+                            fBody.put("comment", Objects.requireNonNull(sdl.fComment.getText()).toString());
+                            fBody.put("settings_extruder_temp", getIntOrNull(sdl.fTempExtruder));
+                            fBody.put("settings_bed_temp", getIntOrNull(sdl.fTempBed));
+                            if (!Objects.requireNonNull(sdl.fMultiColorHexes.getText()).toString().isEmpty()) {
+                                fBody.put("multi_color_hexes", sdl.fMultiColorHexes.getText().toString());
+                                fBody.put("multi_color_direction", sdl.fMultiColorDirection.getText().toString());
+                            }else {
+                                fBody.put("color_hex", Objects.requireNonNull(sdl.fColorHex.getText()).toString().replace("#", ""));
+                            }
+                            fBody.put("external_id", Objects.requireNonNull(sdl.fExternalId.getText()).toString());
+                            String newF = performSmRequest(context, baseUrl + "/filament", "POST", fBody.toString());
+                            if (newF != null) filamentId = new JSONObject(newF).getInt("id");
+                        }
+
+                        if (filamentId != -1) {
+                            JSONObject sBody = new JSONObject();
+                            sBody.put("filament_id", filamentId);
+                            sBody.put("price", getDoubleOrNull(sdl.sPrice));
+                            if (!Objects.requireNonNull(sdl.sFirstUsed.getText()).toString().isEmpty())
+                            {
+                                sBody.put("first_used", Objects.requireNonNull(sdl.sFirstUsed.getText()).toString());
+                            }
+                            if (!Objects.requireNonNull(sdl.sLastUsed.getText()).toString().isEmpty())
+                            {
+                                sBody.put("last_used", Objects.requireNonNull(sdl.sLastUsed.getText()).toString());
+                            }
+                            sBody.put("initial_weight", getDoubleOrNull(sdl.sInitialWeight));
+                            if (getDoubleOrNull(sdl.sRemainingWeight) != JSONObject.NULL)
+                            {
+                                sBody.put("remaining_weight", getDoubleOrNull(sdl.sRemainingWeight));
+
+                            }else if (getDoubleOrNull(sdl.sUsedWeight) != JSONObject.NULL)
+                            {
+                                sBody.put("used_weight", getDoubleOrNull(sdl.sUsedWeight));
+                            }
+                            sBody.put("location", Objects.requireNonNull(sdl.sLocation.getText()).toString());
+                            sBody.put("lot_nr", Objects.requireNonNull(sdl.sLotNr.getText()).toString());
+                            sBody.put("comment", Objects.requireNonNull(sdl.sComment.getText()).toString());
+                            sBody.put("archived", sdl.sArchived.isChecked());
+                            String ret = performSmRequest(context, baseUrl + "/spool", "POST", sBody.toString());
+                            if (ret != null) {
+                                showToast(getString(R.string.spool_created_successfully), Toast.LENGTH_SHORT);
+                                mainHandler.post(() -> spoolDialog.dismiss());
+                            } else {
+                                showToast(getString(R.string.failed_to_create_spool), Toast.LENGTH_SHORT);
+                            }
+                        }
+                    } catch (Exception e) {
+                        showToast(getString(R.string.error_creating_spool), Toast.LENGTH_SHORT);
+                    }
+                });
+            } else {
+                showToast(getString(R.string.spoolman_host_is_not_set), Toast.LENGTH_SHORT);
+            }
+        });
+        spoolDialog.show();
+    }
+
+
+    public void openSettings() {
+        settingsDialog = new Dialog(context, R.style.Theme_U1RFID);
+        settingsDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        settingsDialog.setCanceledOnTouchOutside(false);
+        settingsDialog.setTitle(R.string.settings);
+        SettingsDialogBinding sdl = SettingsDialogBinding.inflate(getLayoutInflater());
+        View rv = sdl.getRoot();
+        settingsDialog.setContentView(rv);
+        sdl.readswitch.setChecked(GetSetting(context, "autoread", false));
+        sdl.readswitch.setOnCheckedChangeListener((buttonView, isChecked) -> SaveSetting(context, "autoread", isChecked));
+        sdl.launchswitch.setChecked(GetSetting(context, "autoLaunch", true));
+        sdl.launchswitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            setNfcLaunchMode(context, isChecked);
+            SaveSetting(context, "autoLaunch", isChecked);
+        });
+        sdl.themeswitch.setChecked(GetSetting(context, "enabledm", false));
+        sdl.themeswitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            SaveSetting(context, "enabledm", isChecked);
+            setThemeMode(isChecked);
+        });
+        sdl.spoolswitch.setChecked(GetSetting(context, "enablesm", false));
+        sdl.smhost.setText(GetSetting(context, "smhost", ""));
+        sdl.smport.setText(String.valueOf(GetSetting(context, "smport", 7912)));
+        sdl.smhost.setEnabled(sdl.spoolswitch.isChecked());
+        sdl.smport.setEnabled(sdl.spoolswitch.isChecked());
+        sdl.spoolswitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            sdl.smhost.setEnabled(isChecked);
+            sdl.smport.setEnabled(isChecked);
+            if (isChecked) {
+                sdl.smhost.setTextColor(ContextCompat.getColor(context, R.color.text_main));
+                sdl.smport.setTextColor(ContextCompat.getColor(context, R.color.text_main));
+                main.smbutton.setVisibility(View.VISIBLE);
+                if (matcher == null)
+                {
+                    executorService.execute(() -> matcher = new ColorMatcher(context));
+                }
+            }
+            else {
+                sdl.smhost.setTextColor(Color.GRAY);
+                sdl.smport.setTextColor(Color.GRAY);
+                main.smbutton.setVisibility(View.INVISIBLE);
+            }
+            SaveSetting(context, "enablesm", isChecked);
+        });
+        if (sdl.spoolswitch.isChecked()) {
+            sdl.smhost.setTextColor(ContextCompat.getColor(context, R.color.text_main));
+            sdl.smport.setTextColor(ContextCompat.getColor(context, R.color.text_main));
+        }
+        else {
+            sdl.smhost.setTextColor(Color.GRAY);
+            sdl.smport.setTextColor(Color.GRAY);
+        }
+        sdl.btncls.setOnClickListener(v -> settingsDialog.dismiss());
+        settingsDialog.setOnDismissListener(dialogInterface -> {
+            SaveSetting(context, "smhost", Objects.requireNonNull(sdl.smhost.getText()).toString());
+            SaveSetting(context, "smport", Integer.parseInt(Objects.requireNonNull(sdl.smport.getText()).toString()));
+        });
+        settingsDialog.show();
     }
 
 }

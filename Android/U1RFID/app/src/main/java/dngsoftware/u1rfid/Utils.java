@@ -13,22 +13,26 @@ import android.media.ToneGenerator;
 import android.net.Uri;
 import android.text.InputFilter;
 import android.text.Spanned;
+import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.ArrayAdapter;
+import android.widget.EditText;
 import android.widget.Spinner;
-
 import androidx.annotation.ColorInt;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-
 import org.json.JSONObject;
-
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -78,6 +82,37 @@ public class Utils {
                 return 250;
         }
         return 1000;
+    }
+
+    public static String GetMaterialDensity(String materialType) {
+        switch (materialType.toUpperCase()) {
+            case "PLA":
+                return "1.24";
+            case "PETG":
+                return "1.27";
+            case "ABS":
+                return "1.04";
+            case "ASA":
+                return "1.07";
+            case "TPU":
+                return "1.21";
+            case "PA":
+            case "PA6":
+                return "1.08";
+            case "PC":
+                return "1.20";
+            case "PP":
+                return "0.90";
+            case "PEEK":
+                return "1.31";
+            case "HIPS":
+                return "1.03";
+            case "PVA":
+                return "1.19";
+            case "BVOH":
+                return "1.14";
+        }
+        return "1.00";
     }
 
     public static void populateDatabase(MatDB db) {
@@ -382,6 +417,70 @@ public class Utils {
             return "Internal";
         }
         return "Unknown";
+    }
+
+    public static Object getDoubleOrNull(EditText editText) {
+        String val = editText.getText().toString().trim();
+        if (val.isEmpty()) return JSONObject.NULL;
+        try {
+            return Double.parseDouble(val);
+        } catch (NumberFormatException e) {
+            return JSONObject.NULL;
+        }
+    }
+
+    public static Object getIntOrNull(EditText editText) {
+        String val = editText.getText().toString().trim();
+        if (val.isEmpty()) return JSONObject.NULL;
+        try {
+            return Integer.parseInt(val);
+        } catch (NumberFormatException e) {
+            return JSONObject.NULL;
+        }
+    }
+
+    public static void hideKeyboard(View view) {
+        if (view == null) return;
+        InputMethodManager imm = (InputMethodManager) view.getContext()
+                .getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+        }
+    }
+
+    public static String performSmRequest(Context context, String urlString, String method, String jsonBody) throws Exception {
+        URL url = new URL(urlString);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod(method);
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setRequestProperty("Accept", "application/json");
+        conn.setConnectTimeout(10000);
+        conn.setReadTimeout(10000);
+        if (jsonBody != null && (method.equals("POST") || method.equals("PATCH") || method.equals("PUT"))) {
+            conn.setDoOutput(true);
+            try (OutputStream os = conn.getOutputStream()) {
+                byte[] input = jsonBody.getBytes(context.getString(R.string.utf_8));
+                os.write(input, 0, input.length);
+            }
+        }
+        int responseCode = conn.getResponseCode();
+        if (responseCode >= 200 && responseCode < 300) {
+            BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), context.getString(R.string.utf_8)));
+            StringBuilder response = new StringBuilder();
+            String line;
+            while ((line = br.readLine()) != null) {
+                response.append(line.trim());
+            }
+            return response.toString();
+        } else {
+            BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), context.getString(R.string.utf_8)));
+            StringBuilder errorResponse = new StringBuilder();
+            String errorLine;
+            while ((errorLine = errorReader.readLine()) != null) {
+                errorResponse.append(errorLine.trim());
+            }
+            return null;
+        }
     }
 
     public static int[] presetColors() {
