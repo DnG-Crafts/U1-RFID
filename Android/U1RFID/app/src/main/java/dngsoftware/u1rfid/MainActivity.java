@@ -399,8 +399,13 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     tagType = getTagType(NfcA.get(currentTag));
                     main.tagid.setText(bytesToHex(uid, true));
                     main.tagid.setVisibility(View.VISIBLE);
-                    if (tagType == 100 || tagType == 213) {
+                    if (tagType == 100) {
                         showToast(getString(R.string.incompatible_tag), Toast.LENGTH_SHORT);
+                        return;
+                    }
+                    else if (tagType == 213 && !GetSetting(this, "acetag", false)) {
+                        showToast(getString(R.string.incompatible_tag), Toast.LENGTH_SHORT);
+                        return;
                     }
                     if (GetSetting(this, "autoread", false)) {
                         if (GetSetting(this, "acetag", false)) {
@@ -623,16 +628,20 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                         return;
                     }
                     OpenSpoolFilament osf = new OpenSpoolFilament(filament.filamentParam);
-                    rawTagWrite(nfcA, 4, new byte[]{123, 0, 101, 0}, 4);
-                    rawTagWrite(nfcA, 5, osf.getBrand().getBytes(StandardCharsets.UTF_8), 20);
-                    rawTagWrite(nfcA, 10, osf.getSubType().getBytes(StandardCharsets.UTF_8), 20);
-                    rawTagWrite(nfcA, 15, osf.getType().getBytes(StandardCharsets.UTF_8),20);
-                    rawTagWrite(nfcA, 20, formatColor(MaterialColor),4);
-                    rawTagWrite(nfcA, 24, doubleLE(osf.getMinTemp(), osf.getMaxTemp()),4);
-                    rawTagWrite(nfcA, 29, doubleLE(osf.getBedMinTemp(), osf.getBedMaxTemp()),4);
-                    rawTagWrite(nfcA, 30, doubleLE(175, GetMaterialLength(main.spoolsize.getSelectedItem().toString())),4);
-                    rawTagWrite(nfcA, 31, new byte[]{(byte) 232, 3, 0, 0},4);
-                    rawTagWrite(nfcA, 33, osf.getID().getBytes(StandardCharsets.UTF_8),20);
+                    byte[] buffer = new byte[144];
+                    putAtPage(buffer, 4, new byte[]{123, 0, (byte) 229, 0}, 4);
+                    putAtPage(buffer, 5, osf.getBrand().getBytes(StandardCharsets.UTF_8), 20);
+                    putAtPage(buffer, 10, osf.getSubType().getBytes(StandardCharsets.UTF_8), 20);
+                    putAtPage(buffer, 15, osf.getType().getBytes(StandardCharsets.UTF_8), 20);
+                    putAtPage(buffer, 20, formatColor(MaterialColor), 4);
+                    //putAtPage(buffer, 21, formatColor(MaterialColor1), 4);
+                    //putAtPage(buffer, 22, formatColor(MaterialColor2), 4);
+                    putAtPage(buffer, 24, doubleLE(osf.getMinTemp(), osf.getMaxTemp()), 4);
+                    putAtPage(buffer, 29, doubleLE(osf.getBedMinTemp(), osf.getBedMaxTemp()), 4);
+                    putAtPage(buffer, 30, doubleLE(175, GetMaterialLength(main.spoolsize.getSelectedItem().toString())), 4);
+                    putAtPage(buffer, 31, new byte[]{(byte) 232, 3, 0, 0}, 4);
+                    putAtPage(buffer, 33, osf.getID().getBytes(StandardCharsets.UTF_8), 20);
+                    rawTagWrite(nfcA, 4, buffer, 144);
                     playBeep();
                     showToast(R.string.data_written_to_tag, Toast.LENGTH_SHORT);
                 } catch (Exception e) {
@@ -661,7 +670,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 try {
                     if (!nfcA.isConnected()) nfcA.connect();
                     byte[] header = rawTagRead(nfcA, 4, 4);
-                    if (Arrays.equals(header, new byte[]{123, 0, 101, 0})) {
+                    if (Arrays.equals(header, new byte[]{123, 0, (byte)229, 0})) {
                         byte[] colorData = rawTagRead(nfcA, 20, 4);
                         MaterialColor = String.format("%02X%02X%02X%02X", colorData[0], colorData[3], colorData[2], colorData[1]);
                         byte[] lengthData = rawTagRead(nfcA, 30, 4);

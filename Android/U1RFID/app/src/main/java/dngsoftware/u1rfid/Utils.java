@@ -385,6 +385,11 @@ public class Utils {
         }
     }
 
+    public static void putAtPage(byte[] buffer, int page, byte[] data, int limit) {
+        int offset = (page - 4) * 4;
+        System.arraycopy(data, 0, buffer, offset, Math.min(data.length, limit));
+    }
+
     public static void rawTagWrite(NfcA nfcA, int startPage, byte[] data, int expectedLength) throws Exception {
         byte[] buffer = new byte[expectedLength];
         System.arraycopy(data, 0, buffer, 0, Math.min(data.length, expectedLength));
