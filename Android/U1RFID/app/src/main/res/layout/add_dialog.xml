@@ -89,7 +89,7 @@
                 android:layout_height="match_parent"
                 android:digits="@string/alphanumeric"
                 android:inputType="textNoSuggestions"
-                android:maxLength="10"
+                android:maxLength="64"
                 android:padding="10dp"
                 android:singleLine="true"
                 android:textColor="@color/text_main" />

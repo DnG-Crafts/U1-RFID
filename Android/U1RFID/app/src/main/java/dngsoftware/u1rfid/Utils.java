@@ -11,6 +11,7 @@ import android.graphics.Color;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
 import android.net.Uri;
+import android.nfc.tech.NfcA;
 import android.text.InputFilter;
 import android.text.Spanned;
 import android.view.View;
@@ -33,7 +34,9 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -82,6 +85,38 @@ public class Utils {
                 return 250;
         }
         return 1000;
+    }
+
+    public static int GetMaterialLength(String materialWeight) {
+        switch (materialWeight) {
+            case "1 KG":
+                return 330;
+            case "750 G":
+                return 247;
+            case "600 G":
+                return 198;
+            case "500 G":
+                return 165;
+            case "250 G":
+                return 82;
+        }
+        return 330;
+    }
+
+    public static String GetMaterialWeight(int materialLength) {
+        switch (materialLength) {
+            case 330:
+                return "1 KG";
+            case 247:
+                return "750 G";
+            case 198:
+                return "600 G";
+            case 165:
+                return "500 G";
+            case 82:
+                return "250 G";
+        }
+        return "1 KG";
     }
 
     public static String GetMaterialDensity(String materialType) {
@@ -217,6 +252,29 @@ public class Utils {
         return sb.toString();
     }
 
+    public static byte[] doubleLE(int firstVal, int secondVal) {
+        byte[] data = new byte[4];
+        data[0] = (byte) (firstVal & 0xFF);
+        data[1] = (byte) ((firstVal >> 8) & 0xFF);
+        data[2] = (byte) (secondVal & 0xFF);
+        data[3] = (byte) ((secondVal >> 8) & 0xFF);
+        return data;
+    }
+
+    public static byte[] formatColor(String hexColor) {
+        try {
+            if (hexColor.startsWith("#")) hexColor = hexColor.substring(1);
+            long color = Long.parseLong(hexColor, 16);
+            int a = (int) ((color >> 24) & 0xFF);
+            int r = (int) ((color >> 16) & 0xFF);
+            int g = (int) ((color >> 8) & 0xFF);
+            int b = (int) (color & 0xFF);
+            return new byte[] { (byte) a, (byte) b, (byte) g, (byte) r };
+        } catch (Exception e) {
+            return new byte[] { (byte) 0xFF, (byte) 0x00, (byte) 0x00, (byte) 0x00 };
+        }
+    }
+
     public static void SetPermissions(Context context) {
         String[] REQUIRED_PERMISSIONS = {Manifest.permission.NFC, Manifest.permission.INTERNET,
                 Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE};
@@ -325,6 +383,40 @@ public class Utils {
                 out.write(buffer, 0, length);
             }
         }
+    }
+
+    public static void rawTagWrite(NfcA nfcA, int startPage, byte[] data, int expectedLength) throws Exception {
+        byte[] buffer = new byte[expectedLength];
+        System.arraycopy(data, 0, buffer, 0, Math.min(data.length, expectedLength));
+        for (int i = 0; i < expectedLength; i += 4) {
+            int currentPage = startPage + (i / 4);
+            if (currentPage > 39) break;
+            byte[] pageData = Arrays.copyOfRange(buffer, i, i + 4);
+            byte[] cmd = new byte[] {
+                    (byte) 0xA2,
+                    (byte) currentPage,
+                    pageData[0], pageData[1], pageData[2], pageData[3]
+            };
+            nfcA.transceive(cmd);
+        }
+    }
+
+    public static byte[] rawTagRead(NfcA nfcA, int startPage, int expectedBytes) throws Exception {
+        ByteBuffer result = ByteBuffer.allocate(expectedBytes);
+        int bytesRead = 0;
+        while (bytesRead < expectedBytes) {
+            int currentPage = startPage + (bytesRead / 4);
+            byte[] cmd = new byte[] { 0x30, (byte) currentPage };
+            byte[] response = nfcA.transceive(cmd);
+            if (response == null || response.length < 16) {
+                throw new Exception("Read failed at page " + currentPage);
+            }
+            int remaining = expectedBytes - bytesRead;
+            int toCopy = Math.min(remaining, 16);
+            result.put(response, 0, toCopy);
+            bytesRead += toCopy;
+        }
+        return result.array();
     }
 
     public static String GetSetting(Context context, String sKey, String sDefault) {

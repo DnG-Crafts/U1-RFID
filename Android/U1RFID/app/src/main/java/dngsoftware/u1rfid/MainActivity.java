@@ -87,6 +87,7 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -167,8 +168,25 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         main.colorview.setBackgroundColor(Color.argb(255, 0, 0, 255));
         main.txtcolor.setText(MaterialColor);
         main.txtcolor.setTextColor(getContrastColor(Color.parseColor("#" + MaterialColor)));
-        main.readbutton.setOnClickListener(view -> readTag(currentTag));
-        main.writebutton.setOnClickListener(view -> writeTag(currentTag));
+
+        main.readbutton.setOnClickListener(view -> {
+            if (GetSetting(this, "acetag", false)) {
+                readAceTag(currentTag);
+            }
+            else{
+                readTag(currentTag);
+            }
+        });
+
+        main.writebutton.setOnClickListener(view -> {
+            if (GetSetting(this, "acetag", false)) {
+                writeAceTag(currentTag);
+            }
+            else{
+                writeTag(currentTag);
+            }
+        });
+
 
         main.menubutton.setOnClickListener(view -> drawerLayout.openDrawer(GravityCompat.START));
         main.addbutton.setOnClickListener(view -> openAddDialog(false));
@@ -239,8 +257,6 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 openSpoolAdd();
             }
         });
-
-
 
     }
 
@@ -387,7 +403,12 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                         showToast(getString(R.string.incompatible_tag), Toast.LENGTH_SHORT);
                     }
                     if (GetSetting(this, "autoread", false)) {
-                        readTag(currentTag);
+                        if (GetSetting(this, "acetag", false)) {
+                            readAceTag(currentTag);
+                        }
+                        else{
+                            readTag(currentTag);
+                        }
                     }
                 }
                 else {
@@ -534,14 +555,16 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
 
 
     public void writeTag(Tag tag) {
+        if (tag == null) {
+            showToast(R.string.no_nfc_tag_found, Toast.LENGTH_SHORT);
+            return;
+        }
         try {
             Filament filament = matDb.getFilamentById(MaterialID);
-
             if (filament == null){
                 showToast(getString(R.string.filament_not_found_in_db), Toast.LENGTH_SHORT);
                 return;
             }
-
             OpenSpoolFilament osf = new OpenSpoolFilament(filament.filamentParam);
             osf.setColor(MaterialColor.substring(2), MaterialColor.substring(0, 2));
             osf.setPhysicals(175,GetMaterialIntWeight(main.spoolsize.getSelectedItem().toString()));
@@ -581,6 +604,109 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         } catch (Exception e) {
             showToast(R.string.error_writing_to_tag, Toast.LENGTH_SHORT);
         }
+    }
+
+
+    private void writeAceTag(Tag tag) {
+        if (tag == null) {
+            showToast(R.string.no_nfc_tag_found, Toast.LENGTH_SHORT);
+            return;
+        }
+        executorService.execute(() -> {
+            NfcA nfcA = NfcA.get(tag);
+            if (nfcA != null) {
+                try {
+                    if (!nfcA.isConnected()) nfcA.connect();
+                    Filament filament = matDb.getFilamentById(MaterialID);
+                    if (filament == null){
+                        showToast(getString(R.string.filament_not_found_in_db), Toast.LENGTH_SHORT);
+                        return;
+                    }
+                    OpenSpoolFilament osf = new OpenSpoolFilament(filament.filamentParam);
+                    rawTagWrite(nfcA, 4, new byte[]{123, 0, 101, 0}, 4);
+                    rawTagWrite(nfcA, 5, osf.getBrand().getBytes(StandardCharsets.UTF_8), 20);
+                    rawTagWrite(nfcA, 10, osf.getSubType().getBytes(StandardCharsets.UTF_8), 20);
+                    rawTagWrite(nfcA, 15, osf.getType().getBytes(StandardCharsets.UTF_8),20);
+                    rawTagWrite(nfcA, 20, formatColor(MaterialColor),4);
+                    rawTagWrite(nfcA, 24, doubleLE(osf.getMinTemp(), osf.getMaxTemp()),4);
+                    rawTagWrite(nfcA, 29, doubleLE(osf.getBedMinTemp(), osf.getBedMaxTemp()),4);
+                    rawTagWrite(nfcA, 30, doubleLE(175, GetMaterialLength(main.spoolsize.getSelectedItem().toString())),4);
+                    rawTagWrite(nfcA, 31, new byte[]{(byte) 232, 3, 0, 0},4);
+                    rawTagWrite(nfcA, 33, osf.getID().getBytes(StandardCharsets.UTF_8),20);
+                    playBeep();
+                    showToast(R.string.data_written_to_tag, Toast.LENGTH_SHORT);
+                } catch (Exception e) {
+                    showToast(R.string.error_writing_to_tag, Toast.LENGTH_SHORT);
+                } finally {
+                    try {
+                        if (nfcA.isConnected()) nfcA.close();
+                    } catch (Exception ignored) {
+                    }
+                }
+            } else {
+                showToast(R.string.invalid_tag_type, Toast.LENGTH_SHORT);
+            }
+        });
+    }
+
+
+    private void readAceTag(Tag tag) {
+        if (tag == null) {
+            showToast(R.string.no_nfc_tag_found, Toast.LENGTH_SHORT);
+            return;
+        }
+        executorService.execute(() -> {
+            NfcA nfcA = NfcA.get(tag);
+            if (nfcA != null) {
+                try {
+                    if (!nfcA.isConnected()) nfcA.connect();
+                    byte[] header = rawTagRead(nfcA, 4, 4);
+                    if (Arrays.equals(header, new byte[]{123, 0, 101, 0})) {
+                        byte[] colorData = rawTagRead(nfcA, 20, 4);
+                        MaterialColor = String.format("%02X%02X%02X%02X", colorData[0], colorData[3], colorData[2], colorData[1]);
+                        byte[] lengthData = rawTagRead(nfcA, 30, 4);
+                        String materialWeight = GetMaterialWeight(((lengthData[3] & 0xFF) << 8) | (lengthData[2] & 0xFF));
+                        String materialID = new String(rawTagRead(nfcA, 33, 16), StandardCharsets.UTF_8).trim();
+                        Filament filament = matDb.getFilamentById(materialID);
+                        if (filament == null){
+                            showToast(getString(R.string.filament_not_found_in_db), Toast.LENGTH_SHORT);
+                            return;
+                        }
+                        OpenSpoolFilament osf = new OpenSpoolFilament(filament.filamentParam);
+                        mainHandler.post(() -> {
+                            userSelect = true;
+                            setSpinnerSelection(main.brand, osf.getBrand());
+                            main.brand.post(() -> {
+                                setSpinnerSelection(main.type, osf.getType());
+                                main.type.post(() -> {
+                                    try {
+                                        setSpinnerSelection(main.subtype, osf.getSubType());
+                                    } catch (Exception ignored) {}
+                                });
+                            });
+
+                            setSpinnerSelection(main.spoolsize, materialWeight);
+                            int colorInt = Color.parseColor("#" + MaterialColor);
+                            main.colorview.setBackgroundColor(colorInt);
+                            main.txtcolor.setText(MaterialColor);
+                            main.txtcolor.setTextColor(getContrastColor(colorInt));
+                            userSelect = false;
+                        });
+                    } else {
+                        showToast(R.string.unknown_or_empty_tag, Toast.LENGTH_SHORT);
+                    }
+                } catch (Exception ignored) {
+                    showToast(R.string.error_reading_tag, Toast.LENGTH_SHORT);
+                } finally {
+                    try {
+                        if (nfcA.isConnected()) nfcA.close();
+                    } catch (Exception ignored) {
+                    }
+                }
+            } else {
+                showToast(R.string.invalid_tag_type, Toast.LENGTH_SHORT);
+            }
+        });
     }
 
 
@@ -1857,6 +1983,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         settingsDialog.setContentView(rv);
         sdl.readswitch.setChecked(GetSetting(context, "autoread", false));
         sdl.readswitch.setOnCheckedChangeListener((buttonView, isChecked) -> SaveSetting(context, "autoread", isChecked));
+        sdl.aceswitch.setChecked(GetSetting(context, "acetag", false));
+        sdl.aceswitch.setOnCheckedChangeListener((buttonView, isChecked) -> SaveSetting(context, "acetag", isChecked));
         sdl.launchswitch.setChecked(GetSetting(context, "autoLaunch", true));
         sdl.launchswitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             setNfcLaunchMode(context, isChecked);
