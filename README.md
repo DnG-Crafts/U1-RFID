@@ -12,7 +12,7 @@ The extended firmware adds many features and fixes which you can read about <a h
 
 <br><br><br>
 The android app is available on google play<br>
-<a href="https://play.google.com/store/apps/details?id=dngsoftware.u1fid&hl=en"><img src=https://github.com/DnG-Crafts/U1-RFID/blob/main/docs/gp.webp width="30%" height="30%"></a>
+<a href="https://play.google.com/store/apps/details?id=dngsoftware.u1rfid&hl=en"><img src=https://github.com/DnG-Crafts/U1-RFID/blob/main/docs/gp.webp width="30%" height="30%"></a>
 <br>
 
 <br>
