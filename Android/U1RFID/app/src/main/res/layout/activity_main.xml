@@ -7,7 +7,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
-    tools:openDrawer="start">
+    tools:openDrawer="end">
 
     <ScrollView
         android:layout_width="match_parent"
@@ -305,6 +305,219 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@+id/colorborder" />
 
+
+            <LinearLayout
+                android:visibility="gone"
+                android:id="@+id/tool_frame"
+                android:layout_width="300dp"
+                android:layout_height="wrap_content"
+                android:baselineAligned="false"
+                android:orientation="horizontal"
+                android:weightSum="4"
+                android:layout_marginTop="10dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/tagid">
+
+                <FrameLayout
+                    android:id="@+id/tool1"
+                    android:layout_width="0dp"
+                    android:layout_height="130dp"
+                    android:layout_margin="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/tool_unselected">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical"
+                        android:paddingTop="22dp">
+
+                        <TextView
+                            android:id="@+id/select1"
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:background="@drawable/circle_tool"
+                            android:gravity="center"
+                            android:text="1"
+                            android:textColor="#000000"
+                            android:textSize="18sp"
+                            android:layout_marginTop="4dp"
+                            android:textStyle="bold" />
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="8dp" />
+
+                        <TextView
+                            android:id="@+id/type1"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="\?"
+                            android:textColor="#FFFFFF"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <View
+                            android:id="@+id/check1"
+                            android:layout_marginTop="2dp"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp" />
+
+                    </LinearLayout>
+                </FrameLayout>
+
+                <FrameLayout
+                    android:id="@+id/tool2"
+                    android:layout_width="0dp"
+                    android:layout_height="130dp"
+                    android:layout_margin="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/tool_unselected">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical"
+                        android:paddingTop="22dp">
+
+                        <TextView
+                            android:id="@+id/select2"
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:background="@drawable/circle_tool"
+                            android:gravity="center"
+                            android:text="2"
+                            android:textColor="#000000"
+                            android:textSize="18sp"
+                            android:layout_marginTop="4dp"
+                            android:textStyle="bold" />
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="8dp" />
+
+                        <TextView
+                            android:id="@+id/type2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="\?"
+                            android:textColor="#FFFFFF"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <View
+                            android:id="@+id/check2"
+                            android:layout_marginTop="2dp"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp" />
+
+                    </LinearLayout>
+                </FrameLayout>
+
+                <FrameLayout
+                    android:id="@+id/tool3"
+                    android:layout_width="0dp"
+                    android:layout_height="130dp"
+                    android:layout_margin="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/tool_unselected">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical"
+                        android:paddingTop="22dp">
+
+                        <TextView
+                            android:id="@+id/select3"
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:background="@drawable/circle_tool"
+                            android:gravity="center"
+                            android:text="3"
+                            android:textColor="#000000"
+                            android:textSize="18sp"
+                            android:layout_marginTop="4dp"
+                            android:textStyle="bold" />
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="8dp" />
+
+                        <TextView
+                            android:id="@+id/type3"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="\?"
+                            android:textColor="#FFFFFF"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <View
+                            android:id="@+id/check3"
+                            android:layout_marginTop="2dp"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp" />
+
+                    </LinearLayout>
+                </FrameLayout>
+
+                <FrameLayout
+                    android:id="@+id/tool4"
+                    android:layout_width="0dp"
+                    android:layout_height="130dp"
+                    android:layout_margin="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/tool_unselected">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical"
+                        android:paddingTop="22dp">
+
+                        <TextView
+                            android:id="@+id/select4"
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:background="@drawable/circle_tool"
+                            android:gravity="center"
+                            android:text="4"
+                            android:textColor="#000000"
+                            android:textSize="18sp"
+                            android:layout_marginTop="4dp"
+                            android:textStyle="bold" />
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="8dp" />
+
+                        <TextView
+                            android:id="@+id/type4"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="\?"
+                            android:textColor="#FFFFFF"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <View
+                            android:id="@+id/check4"
+                            android:layout_marginTop="2dp"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp" />
+
+                    </LinearLayout>
+                </FrameLayout>
+
+            </LinearLayout>
+
+
             <GridLayout
                 android:id="@+id/temp_grid"
                 android:layout_width="280dp"
@@ -410,18 +623,6 @@
                 </LinearLayout>
             </GridLayout>
 
-            <ImageView
-                android:id="@+id/smbutton"
-                android:layout_width="38dp"
-                android:layout_height="38dp"
-                android:layout_marginBottom="38dp"
-                android:importantForAccessibility="no"
-                android:visibility="invisible"
-                android:drawablePadding="8dp"
-                app:srcCompat="@drawable/spoolman"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintBottom_toBottomOf="@+id/temp_grid" />
 
             <LinearLayout
                 android:id="@+id/button_container"
@@ -447,6 +648,16 @@
                     android:textColor="@color/text_inverted"
                     android:textSize="16sp"
                     tools:ignore="ButtonStyle" />
+
+                <ImageView
+                    android:id="@+id/smbutton"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:importantForAccessibility="no"
+                    android:visibility="invisible"
+                    android:drawablePadding="8dp"
+                    app:srcCompat="@drawable/spoolman" />
+
 
                 <Button
                     android:id="@+id/writebutton"

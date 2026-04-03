@@ -8,6 +8,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
 import android.net.Uri;
@@ -19,7 +21,10 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.Spinner;
+import android.widget.TextView;
+
 import androidx.annotation.ColorInt;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -34,14 +39,24 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.WebSocket;
+import okhttp3.WebSocketListener;
 
 
 @SuppressLint("GetInstance")
@@ -102,6 +117,23 @@ public class Utils {
         }
         return 330;
     }
+
+    public static String GetMaterialLength(int materialWeight) {
+        switch (materialWeight) {
+            case 1000:
+                return "330";
+            case 750:
+                return "247";
+            case 600:
+                return "198";
+            case 500:
+                return "165";
+            case 250:
+                return "82";
+        }
+        return "330";
+    }
+
 
     public static String GetMaterialWeight(int materialLength) {
         switch (materialLength) {
@@ -546,37 +578,44 @@ public class Utils {
     }
 
     public static String performSmRequest(Context context, String urlString, String method, String jsonBody) throws Exception {
-        URL url = new URL(urlString);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod(method);
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setRequestProperty("Accept", "application/json");
-        conn.setConnectTimeout(10000);
-        conn.setReadTimeout(10000);
-        if (jsonBody != null && (method.equals("POST") || method.equals("PATCH") || method.equals("PUT"))) {
-            conn.setDoOutput(true);
-            try (OutputStream os = conn.getOutputStream()) {
-                byte[] input = jsonBody.getBytes(context.getString(R.string.utf_8));
-                os.write(input, 0, input.length);
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(urlString);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod(method);
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Accept", "application/json");
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(10000);
+            if (jsonBody != null && (method.equals("POST") || method.equals("PATCH") || method.equals("PUT"))) {
+                conn.setDoOutput(true);
+                try (OutputStream os = conn.getOutputStream()) {
+                    byte[] input = jsonBody.getBytes(context.getString(R.string.utf_8));
+                    os.write(input, 0, input.length);
+                }
             }
-        }
-        int responseCode = conn.getResponseCode();
-        if (responseCode >= 200 && responseCode < 300) {
-            BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), context.getString(R.string.utf_8)));
-            StringBuilder response = new StringBuilder();
-            String line;
-            while ((line = br.readLine()) != null) {
-                response.append(line.trim());
+            int responseCode = conn.getResponseCode();
+            if (responseCode >= 200 && responseCode < 300) {
+                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), context.getString(R.string.utf_8)));
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = br.readLine()) != null) {
+                    response.append(line.trim());
+                }
+                return response.toString();
+            } else {
+                BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), context.getString(R.string.utf_8)));
+                StringBuilder errorResponse = new StringBuilder();
+                String errorLine;
+                while ((errorLine = errorReader.readLine()) != null) {
+                    errorResponse.append(errorLine.trim());
+                }
+                return null;
             }
-            return response.toString();
-        } else {
-            BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), context.getString(R.string.utf_8)));
-            StringBuilder errorResponse = new StringBuilder();
-            String errorLine;
-            while ((errorLine = errorReader.readLine()) != null) {
-                errorResponse.append(errorLine.trim());
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
             }
-            return null;
         }
     }
 
@@ -619,4 +658,242 @@ public class Utils {
                 Color.parseColor("#000000")
         };
     }
+
+    public static String sendMacroCommand(Context context, String Command) throws Exception {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL("http://" + GetSetting(context,"u1host","") + ":7125/printer/gcode/script?script=" + URLEncoder.encode(Command, context.getString(R.string.utf_8)));
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Accept", "*/*");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            int responseCode = conn.getResponseCode();
+            if (responseCode >= 200 && responseCode < 300) {
+                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), context.getString(R.string.utf_8)));
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = br.readLine()) != null) {
+                    response.append(line.trim());
+                }
+                return response.toString();
+            } else {
+                BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream(), context.getString(R.string.utf_8)));
+                StringBuilder errorResponse = new StringBuilder();
+                String errorLine;
+                while ((errorLine = errorReader.readLine()) != null) {
+                    errorResponse.append(errorLine.trim());
+                }
+                return null;
+            }
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
+    }
+
+    public interface MacroCallback {
+        void onResult(boolean success);
+    }
+
+    public interface MacroWsCallback {
+        void onResult(String value);
+    }
+
+    public static void setFilament(Context context, String extruder, String vendor, String type,
+                                   String subtype, String color, MacroCallback callback) {
+        new Thread(() -> {
+            boolean success = false;
+            try {
+                String command = String.format(
+                        "SET_PRINT_FILAMENT_CONFIG CONFIG_EXTRUDER=%s VENDOR='%s' FILAMENT_TYPE='%s' FILAMENT_SUBTYPE='%s' FILAMENT_COLOR_RGBA=%s",
+                        extruder, vendor, type, subtype, color
+                );
+                String ret = sendMacroCommand(context, command);
+                if (ret != null && !ret.isEmpty()) {
+                    JSONObject json = new JSONObject(ret);
+                    success = json.optString("result").equalsIgnoreCase("ok");
+                }
+            } catch (Exception ignored) {}
+            if (callback != null) {
+                callback.onResult(success);
+            }
+        }).start();
+    }
+
+
+    public static void setFilamentAce(Context context, String extruder, String vendor, String type,
+                                   String subtype, String color, String alpha, String official, String length,
+                                      String diameter, String weight, String extMin,String extMax, String bedMin, String bedMax, MacroCallback callback) {
+        new Thread(() -> {
+            boolean success = false;
+            try {
+                String command = String.format(
+                        "SET_FILAMENT_CONFIG CHANNEL=%s VENDOR='%s' TYPE='%s' SUBTYPE='%s' COLOR=%s ALPHA=%s OFFICIAL=%s LENGTH=%s DIAMETER=%s WEIGHT=%s EXT_TEMP_MIN=%s EXT_TEMP_MAX=%s BED_TEMP_MIN=%s BED_TEMP_MAX=%s",
+                        extruder, vendor, type, subtype, color, alpha, official, length, diameter, weight, extMin,extMax,bedMin,bedMax
+                );
+                String ret = sendMacroCommand(context, command);
+                if (ret != null && !ret.isEmpty()) {
+                    JSONObject json = new JSONObject(ret);
+                    success = json.optString("result").equalsIgnoreCase("ok");
+                }
+            } catch (Exception ignored) {}
+            if (callback != null) {
+                callback.onResult(success);
+            }
+        }).start();
+    }
+
+
+    public static void clearFilament(Context context, String extruder, MacroCallback callback) {
+        new Thread(() -> {
+            boolean success = false;
+            try {
+                String command = String.format(
+                        "FILAMENT_DT_CLEAR CHANNEL=%s", extruder
+                );
+                String ret = sendMacroCommand(context, command);
+                if (ret != null && !ret.isEmpty()) {
+                    JSONObject json = new JSONObject(ret);
+                    success = json.optString("result").equalsIgnoreCase("ok");
+                }
+            } catch (Exception ignored) {}
+            if (callback != null) {
+                callback.onResult(success);
+            }
+        }).start();
+    }
+
+
+    public static void getFilament(Context context, String extruder, MacroWsCallback callback) {
+        new Thread(() -> {
+            String ret = null;
+
+            try {
+                String command = String.format(
+                        "FILAMENT_DT_QUERY CHANNEL=%s", extruder
+                );
+                ret = sendMacroCommandWs(context, command);
+            } catch (Exception ignored) {}
+            if (callback != null) {
+                callback.onResult(ret);
+            }
+        }).start();
+    }
+
+
+    public static void getToolSensor(Context context, String extruder, MacroWsCallback callback) {
+        new Thread(() -> {
+            String ret = null;
+            try {
+                String command = String.format(
+                        "QUERY_FILAMENT_SENSOR Sensor=e%s_filament", extruder
+                );
+                ret = sendMacroCommandWs(context, command);
+            } catch (Exception ignored) {}
+            if (callback != null) {
+                callback.onResult(ret);
+            }
+        }).start();
+    }
+
+
+    public static void startDryer(Context context, String temp, String duration, MacroCallback callback) {
+        new Thread(() -> {
+            boolean success = false;
+            try {
+                String command = String.format("ACE_START_DRYING TEMPERATURE=%s DURATION=%s", temp, duration);
+                String ret = sendMacroCommand(context, command);
+                if (ret != null && !ret.isEmpty()) {
+                    JSONObject json = new JSONObject(ret);
+                    success = json.optString("result").equalsIgnoreCase("ok");
+                }
+            } catch (Exception ignored) {}
+            if (callback != null) {
+                callback.onResult(success);
+            }
+        }).start();
+    }
+
+
+    public static void stopDryer(Context context, MacroCallback callback) {
+        new Thread(() -> {
+            boolean success = false;
+            try {
+                String ret = sendMacroCommand(context, "ACE_STOP_DRYING");
+                if (ret != null && !ret.isEmpty()) {
+                    JSONObject json = new JSONObject(ret);
+                    success = json.optString("result").equalsIgnoreCase("ok");
+                }
+            } catch (Exception ignored) {}
+            if (callback != null) {
+                callback.onResult(success);
+            }
+        }).start();
+    }
+
+
+    public static String sendMacroCommandWs(Context context, String command) {
+        OkHttpClient client = new OkHttpClient();
+        final AtomicReference<String> result = new AtomicReference<>("");
+        final CountDownLatch latch = new CountDownLatch(1);
+        Request request = new Request.Builder()
+                .url("ws://" +  GetSetting(context,"u1host","") + ":7125/websocket")
+                .build();
+        client.newWebSocket(request, new WebSocketListener() {
+            @Override
+            public void onOpen(@NonNull WebSocket webSocket, @NonNull Response response) {
+                String json = "{"
+                        + "\"jsonrpc\": \"2.0\","
+                        + "\"method\": \"printer.gcode.script\","
+                        + "\"params\": {\"script\": \"" + command + "\"},"
+                        + "\"id\": " + System.currentTimeMillis()
+                        + "}";
+                webSocket.send(json);
+            }
+
+            @Override
+            public void onMessage(@NonNull WebSocket webSocket, @NonNull String text) {
+                if (text.contains("\"method\": \"notify_gcode_response\"")) {
+                    result.set(text);
+                    webSocket.close(1000, "Done");
+                    latch.countDown();
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull WebSocket webSocket, @NonNull Throwable t, Response response) {
+                result.set("Error: " + t.getMessage());
+                latch.countDown();
+            }
+        });
+
+        try {
+            boolean success = latch.await(5, TimeUnit.SECONDS);
+            if (!success) return "Timeout Error";
+        } catch (InterruptedException e) {
+            return "Interrupted Error";
+        }
+        return result.get();
+    }
+
+
+    public static void updateCircleColor(TextView circleView, String colorHex) {
+        try {
+            if (!colorHex.startsWith("#")) colorHex = "#" + colorHex;
+            int parsedColor = Color.parseColor(colorHex);
+            int contrastColor = getContrastColor(parsedColor);
+            Drawable background = circleView.getBackground();
+            if (background instanceof GradientDrawable) {
+                GradientDrawable shape = (GradientDrawable) background.mutate();
+                shape.setColor(parsedColor);
+                shape.setStroke(1, contrastColor);
+                circleView.setBackground(shape);
+            }
+            circleView.setTextColor(contrastColor);
+        } catch (Exception ignored) {}
+    }
+
+
 }

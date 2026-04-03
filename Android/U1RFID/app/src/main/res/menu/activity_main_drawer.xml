@@ -23,7 +23,6 @@
                 android:title="@string/import_app_database" />
         </menu>
     </item>
-
     <item android:title="@string/rfid_functions">
         <menu>
             <item
@@ -39,6 +38,20 @@
                 android:id="@+id/nav_memory"
                 android:icon="@drawable/twotone_memory_24"
                 android:title="@string/read_tag_memory" />
+        </menu>
+    </item>
+    <item android:title="@string/printer">
+        <menu>
+            <item
+                android:id="@+id/nav_write"
+                android:icon="@drawable/twotone_tool_24"
+                android:title="@string/write_to_u1"
+                app:actionLayout="@layout/switch_item" />
+            <item
+                android:id="@+id/nav_dryer"
+                android:icon="@drawable/twotone_api_24"
+                android:visible="false"
+                android:title="@string/ace_dryer" />
         </menu>
     </item>
 </menu>

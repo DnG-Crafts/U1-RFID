@@ -117,7 +117,7 @@
     <string name="filament_not_found_in_db">Filament not found in db</string>
     <string name="application_json">application/json</string>
     <string name="extended_firmware_url">https://github.com/paxx12/SnapmakerU1-Extended-Firmware</string>
-    <string name="extended_firmware_message">You must install the extended firmware to the U1 for tags written by this app to work.\n\nYou can obtain the extended firmware from</string>
+    <string name="extended_firmware_message">You must install the extended firmware to the U1 for RFID tags written by this app to work.\n\nYou can obtain the extended firmware from</string>
     <string name="i_understand">I Understand</string>
     <string name="extended_firmware_required">Extended Firmware Required</string>
     <string name="tag_memory">Tag Memory</string>
@@ -164,4 +164,17 @@
     <string name="spool_created_successfully">Spool created successfully!</string>
     <string name="failed_to_create_spool">Failed to create spool</string>
     <string name="error_creating_spool">Error creating spool</string>
+    <string name="selected_tool">Selected Tool</string>
+    <string name="select_toolhead">Select Toolhead</string>
+    <string name="set">Set</string>
+    <string name="none">None</string>
+    <string name="ace_dryer">Ace Dryer</string>
+    <string name="set_u1_filament">Set U1 Filament</string>
+    <string name="printer">Printer</string>
+    <string name="ace_dryer_control">Ace Dryer Control</string>
+    <string name="duration">Duration</string>
+    <string name="temperature">Temperature</string>
+    <string name="stop">Stop</string>
+    <string name="start">Start</string>
+    <string name="write_to_u1">Write to U1</string>
 </resources>

@@ -1,299 +1,458 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:fillViewport="true"
-    android:fitsSystemWindows="true"
-    android:maxWidth="500dp"
+    android:layout_height="match_parent"
+    xmlns:tools="http://schemas.android.com/tools"
     android:background="@color/background_main"
-    android:layout_height="wrap_content">
+    android:orientation="vertical"
+    android:fitsSystemWindows="true">
+
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:background="@color/background_main"
+        android:maxWidth="500dp"
+        android:layout_gravity="center_horizontal"
         android:layout_height="wrap_content">
 
-
-        <LinearLayout
-            android:id="@+id/settingsframe"
-            android:layout_width="match_parent"
+        <com.google.android.material.tabs.TabLayout
+            android:id="@+id/tabLayout"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:maxWidth="500dp"
-            android:padding="24dp"
             android:background="@color/background_main"
-            app:layout_constraintWidth_max="500dp"
-            app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintRight_toRightOf="parent"
+            android:paddingTop="10dp"
+            app:tabIndicatorColor="@color/primary_brand"
+            app:tabMode="fixed"
+            app:tabGravity="fill"
+            app:tabMaxWidth="0dp"
+            app:tabTextAppearance="@style/TabTextAppearance"
+            app:tabSelectedTextColor="@color/primary_brand"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent">
 
-            <TextView
+            <com.google.android.material.tabs.TabItem
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="General Settings"
-                android:textStyle="bold"
-                android:textSize="18sp"
-                android:layout_marginTop="30dp"
-                android:textColor="?attr/colorPrimary"
-                android:layout_marginBottom="16dp"/>
+                android:text="General" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingVertical="8dp">
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Auto Read"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/text_main" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Automatically read on tag discovery"
-                        android:textSize="14sp"
-                        android:textColor="@color/text_alt" />
-                </LinearLayout>
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    app:thumbTint="@color/switch_tint_selector"
-                    android:id="@+id/readswitch"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-            </LinearLayout>
-
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingVertical="8dp">
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="ACE Format"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/text_main" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Read and write tags for the U1 ACE mod"
-                        android:textSize="14sp"
-                        android:textColor="@color/text_alt" />
-                </LinearLayout>
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    app:thumbTint="@color/switch_tint_selector"
-                    android:id="@+id/aceswitch"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-            </LinearLayout>
-
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingVertical="8dp">
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Launch App"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/text_main" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Automatically open this app on tag discovery"
-                        android:textSize="14sp"
-                        android:textColor="@color/text_alt" />
-                </LinearLayout>
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/launchswitch"
-                    app:thumbTint="@color/switch_tint_selector"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingVertical="8dp">
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Dark Mode"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/text_main" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Enable a dark theme for this app"
-                        android:textSize="14sp"
-                        android:textColor="@color/text_alt" />
-                </LinearLayout>
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/themeswitch"
-                    app:thumbTint="@color/switch_tint_selector"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-            </LinearLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="#DDDDDD"
-                android:layout_marginVertical="16dp"/>
-
-            <TextView
+            <com.google.android.material.tabs.TabItem
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Spoolman Configuration"
-                android:textStyle="bold"
-                android:textSize="18sp"
-                android:textColor="?attr/colorPrimary"
-                android:layout_marginTop="10dp"
-                android:layout_marginBottom="16dp"/>
+                android:text="Printer" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingVertical="8dp">
+                android:text="Spoolman" />
+        </com.google.android.material.tabs.TabLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/container_main"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:paddingStart="40dp"
+                android:paddingEnd="40dp"
+                android:paddingBottom="20dp"
+                android:paddingTop="20dp"
+                app:layout_constraintWidth_max="500dp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent">
+
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-                    <TextView
-                        android:layout_width="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    app:layout_constraintTop_toTopOf="parent">
+
+
+                    <LinearLayout
+                        android:id="@+id/container_general"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Enable Spoolman"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/text_main" />
-                    <TextView
-                        android:layout_width="wrap_content"
+                        android:orientation="vertical"
+                        android:visibility="visible">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingVertical="8dp">
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Auto Read"
+                                    android:textColor="@color/text_main"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold" />
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Automatically read on tag discovery"
+                                    android:textColor="@color/text_alt"
+                                    android:textSize="14sp" />
+                            </LinearLayout>
+                            <com.google.android.material.materialswitch.MaterialSwitch
+                                android:id="@+id/readswitch"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                app:thumbTint="@color/switch_tint_selector" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingVertical="8dp">
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="ACE Format"
+                                    android:textColor="@color/text_main"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold" />
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Read and write tags for the U1 ACE mod"
+                                    android:textColor="@color/text_alt"
+                                    android:textSize="14sp" />
+                            </LinearLayout>
+                            <com.google.android.material.materialswitch.MaterialSwitch
+                                android:id="@+id/aceswitch"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                app:thumbTint="@color/switch_tint_selector" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingVertical="8dp">
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Launch App"
+                                    android:textColor="@color/text_main"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold" />
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Automatically open this app on tag discovery"
+                                    android:textColor="@color/text_alt"
+                                    android:textSize="14sp" />
+                            </LinearLayout>
+                            <com.google.android.material.materialswitch.MaterialSwitch
+                                android:id="@+id/launchswitch"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                app:thumbTint="@color/switch_tint_selector" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingVertical="8dp">
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Dark Mode"
+                                    android:textColor="@color/text_main"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold" />
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Enable a dark theme for this app"
+                                    android:textColor="@color/text_alt"
+                                    android:textSize="14sp" />
+                            </LinearLayout>
+                            <com.google.android.material.materialswitch.MaterialSwitch
+                                android:id="@+id/themeswitch"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                app:thumbTint="@color/switch_tint_selector" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+
+                    <LinearLayout
+                        android:id="@+id/container_printer"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Enable spoolman functionality"
-                        android:textSize="14sp"
-                        android:textColor="@color/text_alt" />
+                        android:orientation="vertical"
+                        android:visibility="gone">
+
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingVertical="8dp">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="U1 Ace Mod"
+                                    android:textColor="@color/text_main"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Enable Ace functions"
+                                    android:textColor="@color/text_alt"
+                                    android:textSize="14sp" />
+
+                            </LinearLayout>
+
+                            <com.google.android.material.materialswitch.MaterialSwitch
+                                android:id="@+id/modswitch"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                app:thumbTint="@color/switch_tint_selector" />
+
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginVertical="16dp"
+                            android:background="#DDDDDD" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="16dp"
+                            android:text="Printer Host"
+                            android:textColor="?attr/colorPrimary"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:id="@+id/layout_phost"
+                                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="3"
+                                android:layout_marginEnd="8dp"
+                                android:hint="Host Address/IP"
+                                android:textColorHint="@color/primary_brand"
+                                app:boxBackgroundColor="@color/background_alt"
+                                app:boxStrokeColor="@color/input_border_color"
+                                app:expandedHintEnabled="false">
+
+                                <EditText
+                                    android:id="@+id/u1host"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:hint="192.168.1.100"
+                                    android:inputType="textUri"
+                                    android:textColor="@color/text_main"
+                                    android:textColorHint="@color/text_alt" />
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+
+                    <LinearLayout
+                        android:id="@+id/container_spoolman"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:visibility="gone">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingVertical="8dp">
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Enable Spoolman"
+                                    android:textColor="@color/text_main"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold" />
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Enable spoolman functionality"
+                                    android:textColor="@color/text_alt"
+                                    android:textSize="14sp" />
+                            </LinearLayout>
+                            <com.google.android.material.materialswitch.MaterialSwitch
+                                android:id="@+id/spoolswitch"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                app:thumbTint="@color/switch_tint_selector" />
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginVertical="16dp"
+                            android:background="#DDDDDD" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="16dp"
+                            android:text="Spoolman Host / Port"
+                            android:textColor="?attr/colorPrimary"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:id="@+id/layout_host"
+                                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="3"
+                                android:layout_marginEnd="8dp"
+                                android:hint="Host Address"
+                                android:textColorHint="@color/primary_brand"
+                                app:boxBackgroundColor="@color/background_alt"
+                                app:boxStrokeColor="@color/input_border_color"
+                                app:expandedHintEnabled="false">
+
+                                <EditText
+                                    android:id="@+id/smhost"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:hint="192.168.1.100"
+                                    android:inputType="textUri"
+                                    android:textColor="@color/text_main"
+                                    android:textColorHint="@color/text_alt" />
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:id="@+id/layout_port"
+                                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1.2"
+                                android:hint="Port"
+                                android:textColorHint="@color/primary_brand"
+                                app:boxBackgroundColor="@color/background_alt"
+                                app:boxStrokeColor="@color/input_border_color"
+                                app:expandedHintEnabled="false">
+
+                                <EditText
+                                    android:id="@+id/smport"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:hint="7912"
+                                    android:inputType="number"
+                                    android:maxLength="5"
+                                    android:textColor="@color/text_main"
+                                    android:textColorHint="@color/text_alt" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                        </LinearLayout>
+                    </LinearLayout>
+
                 </LinearLayout>
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/spoolswitch"
-                    app:thumbTint="@color/switch_tint_selector"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-            </LinearLayout>
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/layout_host"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                app:boxBackgroundColor="@color/background_alt"
-                app:boxStrokeColor="@color/input_border_color"
-                app:hintTextColor="@color/input_border_color"
-                app:boxStrokeWidth="1.5dp"
-                app:boxStrokeWidthFocused="2dp"
-                android:textColorHint="@color/primary_brand"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="@color/text_main"
-                android:hint="Host Address"
-                app:expandedHintEnabled="false"
-                android:layout_marginTop="12dp">
-                <EditText
-                    android:id="@+id/smhost"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="192.168.1.100"
-                    android:textColorHint="@color/text_alt"
-                    android:textColor="@color/text_main"
-                    android:inputType="textUri" />
-            </com.google.android.material.textfield.TextInputLayout>
+            </androidx.constraintlayout.widget.ConstraintLayout>
+        </androidx.constraintlayout.widget.ConstraintLayout>
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/layout_port"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                app:boxBackgroundColor="@color/background_alt"
-                app:boxStrokeColor="@color/input_border_color"
-                app:hintTextColor="@color/input_border_color"
-                android:textColorHint="@color/primary_brand"
-                app:boxStrokeWidth="1.5dp"
-                app:boxStrokeWidthFocused="2dp"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="@color/text_main"
-                android:hint="Port"
-                app:expandedHintEnabled="false"
-                android:layout_marginTop="12dp">
-                <EditText
-                    android:id="@+id/smport"
-                    android:maxLength="5"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/text_main"
-                    android:textColorHint="@color/text_alt"
-                    android:hint="7912"
-                    android:inputType="number" />
-            </com.google.android.material.textfield.TextInputLayout>
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="#DDDDDD"
-                android:layout_marginVertical="16dp"/>
-        </LinearLayout>
+    </ScrollView>
+
+    <LinearLayout
+        android:id="@+id/container_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:gravity="center">
 
         <Button
             android:textColor="@color/text_inverted"
             android:id="@+id/btncls"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="end"
-            android:layout_marginTop="60dp"
-            android:layout_marginEnd="30dp"
-            android:layout_marginBottom="30dp"
+            android:layout_marginEnd="40dp"
+            android:textSize="16sp"
             android:padding="14dp"
             android:text="@string/close"
+            tools:ignore="ButtonStyle"/>
+
+        <Button
+            android:textColor="@color/text_inverted"
+            android:id="@+id/btnsave"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:textSize="16sp"
-            app:layout_constraintEnd_toEndOf="@+id/settingsframe"
-            app:layout_constraintTop_toBottomOf="@+id/settingsframe" />
+            android:padding="14dp"
+            android:layout_marginStart="40dp"
+            android:text="@string/save"
+            tools:ignore="ButtonStyle"/>
+    </LinearLayout>
 
-        <View
-            android:layout_width="1dp"
-            android:layout_height="40dp"
-            android:background="#00F4F4F4"
-            app:layout_constraintEnd_toEndOf="@+id/settingsframe"
-            app:layout_constraintStart_toStartOf="@+id/settingsframe"
-            app:layout_constraintTop_toBottomOf="@+id/btncls" />
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
-</ScrollView>
+</LinearLayout>
