@@ -124,8 +124,6 @@ def verify_signature_pkcs1(public_key, data, signature):
 ```
 
 
-I have compiled a version of the extended firmware by paxx12 that has this bypass patch applied for testing which can be obtained <a href=https://github.com/DnG-Crafts/U1-RFID/releases/tag/Test>HERE</a>
-
 <br><br>
 
 
