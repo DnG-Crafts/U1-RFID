@@ -10,6 +10,15 @@ This app uses the <a href=https://github.com/spuder/OpenSpool>OpenSpool</a> form
 The extended firmware adds many features and fixes which you can read about <a href=https://snapmakeru1-extended-firmware.pages.dev/>HERE</a>
 
 
+<br><br>
+
+[![https://www.youtube.com/watch?v=71oCmjIfqTc](https://img.youtube.com/vi/71oCmjIfqTc/0.jpg)](https://www.youtube.com/watch?v=71oCmjIfqTc)
+
+https://www.youtube.com/watch?v=71oCmjIfqTc<br>
+
+<br><br>
+
+
 <br><br><br>
 The android app is available on google play<br>
 <a href="https://play.google.com/store/apps/details?id=dngsoftware.u1rfid&hl=en"><img src=https://github.com/DnG-Crafts/U1-RFID/blob/main/docs/gp.webp width="30%" height="30%"></a>
