@@ -287,10 +287,10 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         } else {
             main.smbutton.setVisibility(View.INVISIBLE);
         }
-        main.smbutton.setOnClickListener(view ->
-        {
+
+        main.smbutton.setOnClickListener(view -> {
             if (GetSetting(context, "enablesm", false)) {
-                openSpoolAdd();
+                showSpoolmanMenu();
             }
         });
 
@@ -626,18 +626,47 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 return;
             }
 
-
             if (GetSetting(context, "acemod", false)) {
                 Filament filament = matDb.getFilamentById(MaterialID);
                 if (filament == null) {
                     showToast(getString(R.string.filament_not_found_in_db), Toast.LENGTH_SHORT);
                     return;
                 }
+
                 OpenSpoolFilament osf = new OpenSpoolFilament(filament.filamentParam);
                 osf.setColor(MaterialColor.substring(2), MaterialColor.substring(0, 2));
                 osf.setPhysicals(175, GetMaterialIntWeight(main.spoolsize.getSelectedItem().toString()));
-                setFilamentAce(this, SelectedTool, osf.getBrand(),osf.getType(),osf.getSubType(),osf.getColorHex(),osf.getAlpha(), String.valueOf(GetSetting(context, "u1official", false)), GetMaterialLength(osf.getWeight()), String.valueOf((int)osf.getDiameter()),
-                        String.valueOf(osf.getWeight()), String.valueOf(osf.getMinTemp()), String.valueOf(osf.getMaxTemp()), String.valueOf(osf.getBedMinTemp()), String.valueOf(osf.getBedMaxTemp()), success -> {
+
+                String aceType = osf.getType();
+                String aceSubtype = osf.getSubType();
+
+                if (aceType == null) aceType = "";
+                if (aceSubtype == null) aceSubtype = "";
+
+                // Snapmaker Orca only exposes base PLA in the material list.
+                // For ACE-mod PLA variants such as Basic, Matte, Silk, PLA+, etc.,
+                // send/write plain PLA with a blank subtype so SnOrca does not require PLA/Matte.
+                if ("PLA".equalsIgnoreCase(aceType.trim())) {
+                    aceSubtype = "";
+                }
+
+                setFilamentAce(
+                        this,
+                        SelectedTool,
+                        osf.getBrand(),
+                        aceType,
+                        aceSubtype,
+                        osf.getColorHex(),
+                        osf.getAlpha(),
+                        String.valueOf(GetSetting(context, "u1official", false)),
+                        GetMaterialLength(osf.getWeight()),
+                        String.valueOf((int) osf.getDiameter()),
+                        String.valueOf(osf.getWeight()),
+                        String.valueOf(osf.getMinTemp()),
+                        String.valueOf(osf.getMaxTemp()),
+                        String.valueOf(osf.getBedMinTemp()),
+                        String.valueOf(osf.getBedMaxTemp()),
+                        success -> {
                             runOnUiThread(() -> {
                                 if (success) {
                                     int toolNumber = Integer.parseInt(SelectedTool);
@@ -651,8 +680,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                                     showToast("Failed to set filament configuration", Toast.LENGTH_SHORT);
                                 }
                             });
-                        });
-
+                        }
+                );
 
             } else {
                 setFilament(this, SelectedTool, main.brand.getSelectedItem().toString(), main.type.getSelectedItem().toString(), main.subtype.getSelectedItem().toString(),
@@ -733,22 +762,40 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             showToast(R.string.no_nfc_tag_found, Toast.LENGTH_SHORT);
             return;
         }
+
         executorService.execute(() -> {
             NfcA nfcA = NfcA.get(tag);
             if (nfcA != null) {
                 try {
                     if (!nfcA.isConnected()) nfcA.connect();
+
                     Filament filament = matDb.getFilamentById(MaterialID);
-                    if (filament == null){
+                    if (filament == null) {
                         showToast(getString(R.string.filament_not_found_in_db), Toast.LENGTH_SHORT);
                         return;
                     }
+
                     OpenSpoolFilament osf = new OpenSpoolFilament(filament.filamentParam);
+
+                    String aceType = osf.getType();
+                    String aceSubtype = osf.getSubType();
+
+                    if (aceType == null) aceType = "";
+                    if (aceSubtype == null) aceSubtype = "";
+
+                    // Snapmaker Orca only exposes base PLA in the material list.
+                    // For ACE-mod PLA variants such as Basic, Matte, Silk, PLA+, etc.,
+                    // write plain PLA with a blank subtype.
+                    if ("PLA".equalsIgnoreCase(aceType.trim())) {
+                        aceSubtype = "";
+                    }
+
                     byte[] buffer = new byte[144];
+
                     putAtPage(buffer, 4, new byte[]{123, 0, (byte) 229, 0}, 4);
-                    putAtPage(buffer, 5, osf.getBrand().getBytes(StandardCharsets.UTF_8), 20);
-                    putAtPage(buffer, 10, osf.getSubType().getBytes(StandardCharsets.UTF_8), 20);
-                    putAtPage(buffer, 15, osf.getType().getBytes(StandardCharsets.UTF_8), 20);
+                    putAtPage(buffer, 5, aceSubtype.getBytes(StandardCharsets.UTF_8), 20);
+                    putAtPage(buffer, 10, osf.getBrand().getBytes(StandardCharsets.UTF_8), 20);
+                    putAtPage(buffer, 15, aceType.getBytes(StandardCharsets.UTF_8), 20);
                     putAtPage(buffer, 20, formatColor(MaterialColor), 4);
                     //putAtPage(buffer, 21, formatColor(MaterialColor1), 4);
                     //putAtPage(buffer, 22, formatColor(MaterialColor2), 4);
@@ -757,9 +804,11 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     putAtPage(buffer, 30, doubleLE(175, GetMaterialLength(main.spoolsize.getSelectedItem().toString())), 4);
                     putAtPage(buffer, 31, new byte[]{(byte) 232, 3, 0, 0}, 4);
                     putAtPage(buffer, 33, osf.getID().getBytes(StandardCharsets.UTF_8), 20);
+
                     rawTagWrite(nfcA, 4, buffer, 144);
                     playBeep();
                     showToast(R.string.data_written_to_tag, Toast.LENGTH_SHORT);
+
                 } catch (Exception e) {
                     showToast(R.string.error_writing_to_tag, Toast.LENGTH_SHORT);
                 } finally {
@@ -1869,6 +1918,454 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         }
     }
 
+    private void showSpoolmanMenu() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this, R.style.AlertDialogTheme);
+        builder.setTitle("Spoolman");
+
+        String[] options = new String[] {
+                "Select existing Spoolman spool",
+                "Create current spool in Spoolman"
+        };
+
+        builder.setItems(options, (dialog, which) -> {
+            if (which == 0) {
+                openSpoolmanSelect();
+            } else {
+                openSpoolAdd();
+            }
+        });
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
+    private void openSpoolmanSelect() {
+        String smHost = GetSetting(context, "smhost", "");
+        int smPort = GetSetting(context, "smport", 7912);
+
+        if (smHost.isEmpty()) {
+            showToast("Set Spoolman host first", Toast.LENGTH_SHORT);
+            return;
+        }
+
+        String baseUrl = "http://" + smHost + ":" + smPort + "/api/v1";
+        String sort = Uri.encode("filament.vendor.name:asc,filament.name:asc");
+        String url = baseUrl + "/spool?allow_archived=false&limit=500&sort=" + sort;
+
+        showToast("Loading Spoolman spools...", Toast.LENGTH_SHORT);
+
+        executorService.execute(() -> {
+            try {
+                String response = performSmRequest(context, url, "GET", null);
+
+                if (response == null || response.isEmpty()) {
+                    showToast("No response from Spoolman", Toast.LENGTH_SHORT);
+                    return;
+                }
+
+                JSONArray spools = new JSONArray(response);
+
+                if (spools.length() == 0) {
+                    showToast("No active Spoolman spools found", Toast.LENGTH_SHORT);
+                    return;
+                }
+
+                ArrayList<JSONObject> spoolObjects = new ArrayList<>();
+                ArrayList<String> labels = new ArrayList<>();
+
+                for (int i = 0; i < spools.length(); i++) {
+                    JSONObject spool = spools.getJSONObject(i);
+                    JSONObject filament = spool.getJSONObject("filament");
+                    JSONObject vendor = filament.optJSONObject("vendor");
+
+                    String vendorName = vendor != null ? vendor.optString("name", "Unknown") : "Unknown";
+                    String filamentName = filament.optString("name", "");
+                    String material = filament.optString("material", "");
+                    String color = filament.optString("color_hex", "");
+                    String location = spool.optString("location", "");
+                    double remainingWeight = spool.optDouble("remaining_weight", -1);
+
+                    StringBuilder label = new StringBuilder();
+                    label.append("#").append(spool.optInt("id")).append(" - ");
+                    label.append(vendorName);
+
+                    if (!filamentName.isEmpty()) {
+                        label.append(" ").append(filamentName);
+                    }
+
+                    if (!material.isEmpty()) {
+                        label.append(" [").append(material).append("]");
+                    }
+
+                    if (remainingWeight >= 0) {
+                        label.append(" - ").append((int) Math.round(remainingWeight)).append("g");
+                    }
+
+                    if (!color.isEmpty()) {
+                        label.append(" - #").append(color);
+                    }
+
+                    if (!location.isEmpty()) {
+                        label.append(" - ").append(location);
+                    }
+
+                    spoolObjects.add(spool);
+                    labels.add(label.toString());
+                }
+
+                mainHandler.post(() -> {
+                    ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, labels) {
+                        @NonNull
+                        @Override
+                        public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                            JSONObject spool = spoolObjects.get(position);
+
+                            LinearLayout row = new LinearLayout(MainActivity.this);
+                            row.setOrientation(LinearLayout.VERTICAL);
+                            row.setPadding(28, 22, 28, 22);
+
+                            try {
+                                JSONObject filament = spool.getJSONObject("filament");
+                                JSONObject vendor = filament.optJSONObject("vendor");
+
+                                String vendorName = vendor != null ? vendor.optString("name", "Unknown") : "Unknown";
+                                String filamentName = filament.optString("name", "");
+                                String material = filament.optString("material", "");
+                                String color = filament.optString("color_hex", "");
+                                String location = spool.optString("location", "");
+                                double remainingWeight = spool.optDouble("remaining_weight", -1);
+
+                                TextView title = new TextView(MainActivity.this);
+                                title.setTextSize(17);
+                                title.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.text_main));
+                                title.setTypeface(null, android.graphics.Typeface.BOLD);
+
+                                String titleText = "#" + spool.optInt("id") + " - " + vendorName;
+                                if (!filamentName.isEmpty()) {
+                                    titleText += " " + filamentName;
+                                }
+                                title.setText(titleText);
+
+                                TextView subtitle = new TextView(MainActivity.this);
+                                subtitle.setTextSize(14);
+                                subtitle.setTextColor(Color.LTGRAY);
+
+                                ArrayList<String> parts = new ArrayList<>();
+
+                                if (!material.isEmpty()) {
+                                    parts.add(material);
+                                }
+
+                                if (remainingWeight >= 0) {
+                                    parts.add((int) Math.round(remainingWeight) + "g");
+                                }
+
+                                if (!color.isEmpty()) {
+                                    parts.add("#" + color);
+                                }
+
+                                if (!location.isEmpty()) {
+                                    parts.add(location);
+                                }
+
+                                subtitle.setText(String.join("  •  ", parts));
+
+                                View divider = new View(MainActivity.this);
+                                LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                        2
+                                );
+                                dividerParams.setMargins(0, 18, 0, 0);
+                                divider.setLayoutParams(dividerParams);
+                                divider.setBackgroundColor(ContextCompat.getColor(MainActivity.this, R.color.primary_brand));
+
+                                row.addView(title);
+                                row.addView(subtitle);
+                                row.addView(divider);
+
+                            } catch (Exception e) {
+                                TextView fallback = new TextView(MainActivity.this);
+                                fallback.setText(labels.get(position));
+                                fallback.setTextSize(16);
+                                fallback.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.text_main));
+                                row.addView(fallback);
+                            }
+
+                            return row;
+                        }
+                    };
+
+                    AlertDialog.Builder builder = new AlertDialog.Builder(this, R.style.AlertDialogTheme);
+                    builder.setTitle("Select Spoolman Spool");
+
+                    builder.setAdapter(adapter, (dialog, which) -> {
+                        try {
+                            applySpoolmanSpool(spoolObjects.get(which));
+                        } catch (Exception e) {
+                            showToast("Failed to apply Spoolman spool", Toast.LENGTH_SHORT);
+                        }
+                    });
+
+                    builder.setNegativeButton(R.string.cancel, (dialog, which) -> dialog.dismiss());
+
+                    AlertDialog dialog = builder.create();
+                    dialog.show();
+                });
+
+            } catch (Exception e) {
+                showToast("Failed to read Spoolman: " + e.getMessage(), Toast.LENGTH_LONG);
+            }
+        });
+    }
+
+    private void applySpoolmanSpool(JSONObject spool) throws Exception {
+        JSONObject filamentJson = spool.getJSONObject("filament");
+        JSONObject vendorJson = filamentJson.optJSONObject("vendor");
+
+        int spoolId = spool.getInt("id");
+
+        // Keep this short. The ACE tag stores the ID in a fixed raw field.
+        String localId = "SM" + spoolId;
+
+        String brand = vendorJson != null ? vendorJson.optString("name", "Generic") : "Generic";
+
+        String rawMaterial = filamentJson.optString("material", "PLA");
+        String filamentName = filamentJson.optString("name", "");
+
+        String type = normalizeSpoolmanMaterial(rawMaterial, filamentName);
+        String subtype = inferSpoolmanSubtype(filamentJson, rawMaterial, filamentName);
+
+        String colorAarrggbb = spoolmanColorToMaterialColor(filamentJson);
+        int weightGram = getSpoolmanWeightGram(spool, filamentJson);
+        double diameter = filamentJson.optDouble("diameter", 1.75);
+
+        FilamentRegistry.FilamentProfile profile = FilamentRegistry.getProfile(type);
+
+        int maxNozzle = filamentJson.has("settings_extruder_temp") && !filamentJson.isNull("settings_extruder_temp")
+                ? filamentJson.optInt("settings_extruder_temp")
+                : profile.maxNozzleTemp;
+
+        int maxBed = filamentJson.has("settings_bed_temp") && !filamentJson.isNull("settings_bed_temp")
+                ? filamentJson.optInt("settings_bed_temp")
+                : profile.maxBedTemp;
+
+        OpenSpoolFilament osf = new OpenSpoolFilament();
+        osf.setID(localId);
+        osf.setType(brand, type, subtype);
+        osf.setColor(colorAarrggbb.substring(2), colorAarrggbb.substring(0, 2));
+        osf.setPhysicals(diameter, weightGram);
+        osf.setTemps(profile.minNozzleTemp, maxNozzle, profile.minBedTemp, maxBed);
+
+        Filament existing = matDb.getFilamentById(localId);
+
+        int position;
+        if (existing != null) {
+            position = existing.position;
+            matDb.deleteItem(existing);
+        } else {
+            position = matDb.getItemCount();
+        }
+
+        Filament localFilament = new Filament();
+        localFilament.position = position;
+        localFilament.filamentID = localId;
+        localFilament.filamentName = type;
+        localFilament.filamentVendor = brand;
+        localFilament.filamentParam = osf.toString();
+
+        matDb.addItem(localFilament);
+
+        MaterialID = localId;
+        MaterialColor = colorAarrggbb;
+        MaterialWeight = GetMaterialWeightByInt(weightGram);
+
+        loadMaterials();
+
+        mainHandler.postDelayed(() -> {
+            try {
+                setSpinnerSelection(main.brand, brand);
+
+                main.brand.postDelayed(() -> {
+                    try {
+                        setSpinnerSelection(main.type, type);
+
+                        main.type.postDelayed(() -> {
+                            try {
+                                setSpinnerSelection(main.subtype, subtype);
+                            } catch (Exception ignored) {}
+                        }, 200);
+
+                    } catch (Exception ignored) {}
+                }, 200);
+
+                setSpinnerSelection(main.spoolsize, MaterialWeight);
+
+                int colorInt = Color.parseColor("#" + MaterialColor);
+                main.colorview.setBackgroundColor(colorInt);
+                main.txtcolor.setText(MaterialColor);
+                main.txtcolor.setTextColor(getContrastColor(colorInt));
+
+                showToast("Loaded Spoolman spool #" + spoolId, Toast.LENGTH_SHORT);
+
+            } catch (Exception e) {
+                showToast("Loaded spool, but failed to update UI", Toast.LENGTH_SHORT);
+            }
+        }, 300);
+    }
+
+    private String normalizeSpoolmanMaterial(String rawMaterial, String filamentName) {
+        String combined = ((rawMaterial == null ? "" : rawMaterial) + " " + (filamentName == null ? "" : filamentName))
+                .trim()
+                .toUpperCase(Locale.US)
+                .replace("_", "-");
+
+        if (combined.contains("PLA-AERO") || combined.contains("PLA AERO") || combined.contains("AERO")) {
+            return "PLA-AERO";
+        }
+
+        if (combined.contains("PLA-CF") || combined.contains("PLA CF") || combined.contains("CARBON")) {
+            return "PLA-CF";
+        }
+
+        if (combined.contains("PLA")) {
+            return "PLA";
+        }
+
+        if (combined.contains("PETG")) {
+            return "PETG";
+        }
+
+        if (combined.contains("ABS")) {
+            return "ABS";
+        }
+
+        if (combined.contains("ASA")) {
+            return "ASA";
+        }
+
+        if (combined.contains("TPU")) {
+            return "TPU";
+        }
+
+        if (combined.contains("PVA")) {
+            return "PVA";
+        }
+
+        if (combined.contains("PA")) {
+            return "PA";
+        }
+
+        if (rawMaterial != null && !rawMaterial.trim().isEmpty()) {
+            return rawMaterial.trim();
+        }
+
+        return "PLA";
+    }
+
+    private String inferSpoolmanSubtype(JSONObject filamentJson, String rawMaterial, String filamentName) {
+        String explicit = getSpoolmanExtraString(filamentJson, "u1_subtype");
+
+        if (!explicit.isEmpty()) {
+            return explicit;
+        }
+
+        String combined = ((rawMaterial == null ? "" : rawMaterial) + " " + (filamentName == null ? "" : filamentName))
+                .toUpperCase(Locale.US);
+
+        if (combined.contains("MATTE")) return "Matte";
+        if (combined.contains("SILK")) return "Silk";
+        if (combined.contains("BASIC")) return "Basic";
+        if (combined.contains("PLUS") || combined.contains("PLA+")) return "PLA+";
+        if (combined.contains("HIGH SPEED") || combined.contains("HS")) return "High Speed";
+        if (combined.contains("WOOD")) return "Wood";
+        if (combined.contains("MARBLE")) return "Marble";
+        if (combined.contains("METAL")) return "Metal";
+
+        return "Basic";
+    }
+
+    private String getSpoolmanExtraString(JSONObject item, String key) {
+        try {
+            JSONObject extra = item.optJSONObject("extra");
+            if (extra == null || !extra.has(key) || extra.isNull(key)) {
+                return "";
+            }
+
+            String value = extra.optString(key, "").trim();
+
+            // Spoolman extra field values may be JSON-encoded strings.
+            if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+                value = value.substring(1, value.length() - 1);
+            }
+
+            return value.trim();
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private String spoolmanColorToMaterialColor(JSONObject filamentJson) {
+        String hex = filamentJson.optString("color_hex", "");
+
+        if ((hex == null || hex.isEmpty()) && filamentJson.has("multi_color_hexes")) {
+            String multi = filamentJson.optString("multi_color_hexes", "");
+            if (!multi.isEmpty()) {
+                hex = multi.split(",")[0];
+            }
+        }
+
+        if (hex == null) {
+            hex = "";
+        }
+
+        hex = hex.replace("#", "").trim().toUpperCase(Locale.US);
+
+        if (hex.length() >= 8) {
+            // Spoolman color is RRGGBBAA when alpha is present.
+            String rgb = hex.substring(0, 6);
+            String alpha = hex.substring(6, 8);
+            return alpha + rgb;
+        }
+
+        if (hex.length() >= 6) {
+            return "FF" + hex.substring(0, 6);
+        }
+
+        return "FFFFFFFF";
+    }
+
+    private int getSpoolmanWeightGram(JSONObject spoolJson, JSONObject filamentJson) {
+        double weight = -1;
+
+        if (spoolJson.has("remaining_weight") && !spoolJson.isNull("remaining_weight")) {
+            weight = spoolJson.optDouble("remaining_weight", -1);
+        } else if (spoolJson.has("initial_weight") && !spoolJson.isNull("initial_weight")) {
+            weight = spoolJson.optDouble("initial_weight", -1);
+        } else if (filamentJson.has("weight") && !filamentJson.isNull("weight")) {
+            weight = filamentJson.optDouble("weight", -1);
+        }
+
+        if (weight <= 0) {
+            return 1000;
+        }
+
+        int rounded = (int) Math.round(weight);
+
+        // U1-RFID currently only has these fixed size options.
+        int[] allowed = new int[] {1000, 750, 600, 500, 250};
+        int best = 1000;
+        int bestDiff = Integer.MAX_VALUE;
+
+        for (int candidate : allowed) {
+            int diff = Math.abs(candidate - rounded);
+            if (diff < bestDiff) {
+                best = candidate;
+                bestDiff = diff;
+            }
+        }
+
+        return best;
+    }
 
     void openSpoolAdd() {
         spoolDialog = new Dialog(context, R.style.Theme_U1RFID);
