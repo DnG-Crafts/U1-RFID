@@ -40,11 +40,13 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.InputFilter;
+import android.text.Editable;
 import android.text.InputType;
 import android.text.SpannableString;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ForegroundColorSpan;
 import android.text.util.Linkify;
+import android.text.TextWatcher;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.MenuItem;
@@ -75,6 +77,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -141,6 +144,14 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     private String[] vendor = new String[4];
     private View[] check = new View[4];
     private String[] color = new String[4];
+    // Holds the exact Spoolman-backed local material ID after selecting a spool from Spoolman.
+    // This prevents duplicate brand/type/subtype entries from silently falling back to the first matching spool.
+    private String selectedSpoolmanMaterialID = null;
+
+    // True while the app is changing brand/type/subtype spinners in code.
+    // Android fires spinner callbacks for programmatic selections too; those callbacks must not infer
+    // a different MaterialID while a Spoolman spool is being loaded.
+    private boolean suppressMaterialSelectionCallbacks = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -277,6 +288,16 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         });
 
 
+        View.OnTouchListener clearSpoolmanWriteLockOnManualSelection = (v, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                selectedSpoolmanMaterialID = null;
+            }
+            return false;
+        };
+        main.brand.setOnTouchListener(clearSpoolmanWriteLockOnManualSelection);
+        main.type.setOnTouchListener(clearSpoolmanWriteLockOnManualSelection);
+        main.subtype.setOnTouchListener(clearSpoolmanWriteLockOnManualSelection);
+
         if (!GetSetting(this, "firm_notice", false)) {
             showFirmwareNotice();
         }
@@ -287,10 +308,10 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         } else {
             main.smbutton.setVisibility(View.INVISIBLE);
         }
-        main.smbutton.setOnClickListener(view ->
-        {
+
+        main.smbutton.setOnClickListener(view -> {
             if (GetSetting(context, "enablesm", false)) {
-                openSpoolAdd();
+                showSpoolmanMenu();
             }
         });
 
@@ -483,37 +504,58 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             List<Filament> allFilaments = matDb.getAllItems();
             List<String> brands = getUniqueValues(allFilaments, "brand");
             ArrayAdapter<String> brandAdapter = new ArrayAdapter<>(this, R.layout.spinner_item, brands);
+
             main.brand.setAdapter(brandAdapter);
+
             main.brand.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                    String selectedBrand = brands.get(position);
-                    List<Filament> brandFiltered = new ArrayList<>();
-                    for (Filament f : allFilaments)
-                        if (f.filamentVendor.equals(selectedBrand)) brandFiltered.add(f);
-                    List<String> types = getUniqueValues(brandFiltered, "type");
-                    main.type.setAdapter(new ArrayAdapter<>(MainActivity.this, R.layout.spinner_item, types));
-                    main.type.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                        @Override
-                        public void onItemSelected(AdapterView<?> p2, View v2, int pos2, long id2) {
-                            String selectedType = types.get(pos2);
-                            List<String> subtypes = new ArrayList<>();
-                            for (Filament f : brandFiltered) {
+                    try {
+                        if (position < 0 || position >= brands.size()) return;
+
+                        String selectedBrand = brands.get(position);
+                        List<Filament> brandFiltered = new ArrayList<>();
+                        for (Filament f : allFilaments) {
+                            if (f.filamentVendor.equals(selectedBrand)) {
+                                brandFiltered.add(f);
+                            }
+                        }
+
+                        List<String> types = getUniqueValues(brandFiltered, "type");
+                        main.type.setAdapter(new ArrayAdapter<>(MainActivity.this, R.layout.spinner_item, types));
+
+                        main.type.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                            @Override
+                            public void onItemSelected(AdapterView<?> p2, View v2, int pos2, long id2) {
                                 try {
-                                    JSONObject json = new JSONObject(f.filamentParam);
-                                    if (json.optString("type").equals(selectedType)) {
-                                        subtypes.add(json.optString("subtype", "Basic"));
+                                    if (pos2 < 0 || pos2 >= types.size()) return;
+
+                                    String selectedType = types.get(pos2);
+                                    List<String> subtypes = new ArrayList<>();
+                                    for (Filament f : brandFiltered) {
+                                        try {
+                                            JSONObject json = new JSONObject(f.filamentParam);
+                                            if (json.optString("type").equals(selectedType)) {
+                                                String sub = json.optString("subtype", "Basic");
+                                                if (!subtypes.contains(sub)) {
+                                                    subtypes.add(sub);
+                                                }
+                                            }
+                                        } catch (Exception ignored) {
+                                        }
                                     }
+
+                                    main.subtype.setAdapter(new ArrayAdapter<>(MainActivity.this, R.layout.spinner_item, subtypes));
                                 } catch (Exception ignored) {
                                 }
                             }
-                            main.subtype.setAdapter(new ArrayAdapter<>(MainActivity.this, R.layout.spinner_item, subtypes));
-                        }
 
-                        @Override
-                        public void onNothingSelected(AdapterView<?> parent) {
-                        }
-                    });
+                            @Override
+                            public void onNothingSelected(AdapterView<?> parent) {
+                            }
+                        });
+                    } catch (Exception ignored) {
+                    }
                 }
 
                 @Override
@@ -524,20 +566,59 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             main.subtype.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                    String sub = parent.getItemAtPosition(position).toString();
-                    for (Filament f : allFilaments) {
-                        try {
-                            JSONObject json = new JSONObject(f.filamentParam);
-                            if (json.optString("brand").equals(main.brand.getSelectedItem().toString()) && json.optString("type").equals(main.type.getSelectedItem().toString()) && json.optString("subtype").equals(sub)) {
-                                MaterialID = json.optString("id");
-                                main.extMax.setText(String.format(Locale.getDefault(),"%d°C", json.optInt("max_temp")));
-                                main.extMin.setText(String.format(Locale.getDefault(),"%d°C", json.optInt("min_temp")));
-                                main.bedMax.setText(String.format(Locale.getDefault(),"%d°C", json.optInt("bed_max_temp")));
-                                main.bedMin.setText(String.format(Locale.getDefault(),"%d°C", json.optInt("bed_min_temp")));
-                                break;
+                    try {
+                        if (position < 0 || parent.getCount() == 0) return;
+
+                        // Programmatic selections are used when reading a tag or loading a Spoolman spool.
+                        // Spinner callbacks fire for those selections too, and the old fallback matching could
+                        // replace the exact SM### spool ID with the first matching Polymaker/PLA item, such as SM7.
+                        if (suppressMaterialSelectionCallbacks || userSelect) {
+                            String lockedDuringProgrammaticUpdate = resolveMaterialIDForWrite();
+                            if (lockedDuringProgrammaticUpdate != null && matDb.getFilamentById(lockedDuringProgrammaticUpdate) != null) {
+                                MaterialID = lockedDuringProgrammaticUpdate;
+                                updateTempDisplayFromMaterialId(MaterialID);
                             }
-                        } catch (Exception ignored) {
+                            return;
                         }
+
+                        // If a Spoolman spool is locked, always keep that exact local SM### ID.
+                        // Do not require the current brand/type/subtype spinner state to match because those spinners
+                        // can temporarily show default values while the app is still programmatically loading the spool.
+                        if (isSpoolmanMaterialId(selectedSpoolmanMaterialID)) {
+                            String lockedId = selectedSpoolmanMaterialID.trim().toUpperCase(Locale.US);
+                            if (matDb.getFilamentById(lockedId) != null) {
+                                MaterialID = lockedId;
+                                updateTempDisplayFromMaterialId(MaterialID);
+                                return;
+                            }
+                        }
+
+                        String sub = parent.getItemAtPosition(position).toString();
+                        Object brandItem = main.brand.getSelectedItem();
+                        Object typeItem = main.type.getSelectedItem();
+
+                        if (brandItem == null || typeItem == null) return;
+
+                        String selectedBrand = brandItem.toString();
+                        String selectedType = typeItem.toString();
+
+                        for (Filament f : allFilaments) {
+                            try {
+                                JSONObject json = new JSONObject(f.filamentParam);
+                                if (json.optString("brand").equals(selectedBrand)
+                                        && json.optString("type").equals(selectedType)
+                                        && json.optString("subtype", "Basic").equals(sub)) {
+                                    MaterialID = json.optString("id");
+                                    selectedSpoolmanMaterialID = isSpoolmanMaterialId(MaterialID)
+                                            ? MaterialID.trim().toUpperCase(Locale.US)
+                                            : null;
+                                    updateTempDisplayFromFilamentJson(json);
+                                    break;
+                                }
+                            } catch (Exception ignored) {
+                            }
+                        }
+                    } catch (Exception ignored) {
                     }
                 }
 
@@ -573,6 +654,11 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                             String jsonString = new String(payload, StandardCharsets.UTF_8);
                             OpenSpoolFilament filament = new OpenSpoolFilament(jsonString);
                             mainHandler.post(() -> {
+                                String readId = cleanAceText(filament.getID());
+                                MaterialID = readId;
+                                selectedSpoolmanMaterialID = isSpoolmanMaterialId(readId) ? readId.toUpperCase(Locale.US) : null;
+
+                                suppressMaterialSelectionCallbacks = true;
                                 userSelect = true;
                                 setSpinnerSelection(main.brand, filament.getBrand());
                                 main.brand.postDelayed(() -> {
@@ -581,7 +667,11 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                                         try {
                                             JSONObject json = new JSONObject(jsonString);
                                             setSpinnerSelection(main.subtype, json.optString("subtype", "Basic"));
-                                        } catch (Exception ignored) {}
+                                        } catch (Exception ignored) {
+                                        } finally {
+                                            suppressMaterialSelectionCallbacks = false;
+                                            userSelect = false;
+                                        }
                                     },200);
                                 }, 200);
 
@@ -594,7 +684,6 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                                 main.txtcolor.setText(MaterialColor);
                                 main.txtcolor.setTextColor(getContrastColor(colorInt));
                                 showToast(R.string.data_read_from_tag, Toast.LENGTH_SHORT);
-                                userSelect = false;
                             });
                             return;
                         }
@@ -626,18 +715,53 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 return;
             }
 
-
             if (GetSetting(context, "acemod", false)) {
-                Filament filament = matDb.getFilamentById(MaterialID);
+                String writeMaterialID = resolveMaterialIDForWrite();
+                Filament filament = matDb.getFilamentById(writeMaterialID);
                 if (filament == null) {
                     showToast(getString(R.string.filament_not_found_in_db), Toast.LENGTH_SHORT);
                     return;
                 }
+
+                MaterialID = writeMaterialID;
+
                 OpenSpoolFilament osf = new OpenSpoolFilament(filament.filamentParam);
+                if (isSpoolmanMaterialId(writeMaterialID)) {
+                    osf.setID(writeMaterialID.trim().toUpperCase(Locale.US));
+                }
                 osf.setColor(MaterialColor.substring(2), MaterialColor.substring(0, 2));
                 osf.setPhysicals(175, GetMaterialIntWeight(main.spoolsize.getSelectedItem().toString()));
-                setFilamentAce(this, SelectedTool, osf.getBrand(),osf.getType(),osf.getSubType(),osf.getColorHex(),osf.getAlpha(), String.valueOf(GetSetting(context, "u1official", false)), GetMaterialLength(osf.getWeight()), String.valueOf((int)osf.getDiameter()),
-                        String.valueOf(osf.getWeight()), String.valueOf(osf.getMinTemp()), String.valueOf(osf.getMaxTemp()), String.valueOf(osf.getBedMinTemp()), String.valueOf(osf.getBedMaxTemp()), success -> {
+
+                String aceType = osf.getType();
+                String aceSubtype = osf.getSubType();
+
+                if (aceType == null) aceType = "";
+                if (aceSubtype == null) aceSubtype = "";
+
+                // Snapmaker Orca only exposes base PLA in the material list.
+                // For ACE-mod PLA variants such as Basic, Matte, Silk, PLA+, etc.,
+                // send/write plain PLA with a blank subtype so SnOrca does not require PLA/Matte.
+                if ("PLA".equalsIgnoreCase(aceType.trim())) {
+                    aceSubtype = "";
+                }
+
+                setFilamentAce(
+                        this,
+                        SelectedTool,
+                        osf.getBrand(),
+                        aceType,
+                        aceSubtype,
+                        osf.getColorHex(),
+                        osf.getAlpha(),
+                        String.valueOf(GetSetting(context, "u1official", false)),
+                        GetMaterialLength(osf.getWeight()),
+                        String.valueOf((int) osf.getDiameter()),
+                        String.valueOf(osf.getWeight()),
+                        String.valueOf(osf.getMinTemp()),
+                        String.valueOf(osf.getMaxTemp()),
+                        String.valueOf(osf.getBedMinTemp()),
+                        String.valueOf(osf.getBedMaxTemp()),
+                        success -> {
                             runOnUiThread(() -> {
                                 if (success) {
                                     int toolNumber = Integer.parseInt(SelectedTool);
@@ -645,14 +769,14 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                                     type[toolNumber].setText(main.type.getSelectedItem().toString());
                                     SaveSetting(context, "tool" + (toolNumber + 1) + "_type", main.type.getSelectedItem().toString());
                                     SaveSetting(context, "tool" + (toolNumber + 1) + "_color", main.txtcolor.getText().toString());
-                                    SaveSetting(context, "tool" + (toolNumber + 1) + "_id", MaterialID);
+                                    SaveSetting(context, "tool" + (toolNumber + 1) + "_id", writeMaterialID);
                                     showToast("Filament configuration saved successfully", Toast.LENGTH_SHORT);
                                 } else {
                                     showToast("Failed to set filament configuration", Toast.LENGTH_SHORT);
                                 }
                             });
-                        });
-
+                        }
+                );
 
             } else {
                 setFilament(this, SelectedTool, main.brand.getSelectedItem().toString(), main.type.getSelectedItem().toString(), main.subtype.getSelectedItem().toString(),
@@ -681,12 +805,19 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             return;
         }
         try {
-            Filament filament = matDb.getFilamentById(MaterialID);
+            String writeMaterialID = resolveMaterialIDForWrite();
+            Filament filament = matDb.getFilamentById(writeMaterialID);
             if (filament == null){
                 showToast(getString(R.string.filament_not_found_in_db), Toast.LENGTH_SHORT);
                 return;
             }
+
+            MaterialID = writeMaterialID;
+
             OpenSpoolFilament osf = new OpenSpoolFilament(filament.filamentParam);
+            if (isSpoolmanMaterialId(writeMaterialID)) {
+                osf.setID(writeMaterialID.trim().toUpperCase(Locale.US));
+            }
             osf.setColor(MaterialColor.substring(2), MaterialColor.substring(0, 2));
             osf.setPhysicals(175,GetMaterialIntWeight(main.spoolsize.getSelectedItem().toString()));
             byte[] payload = osf.toString().getBytes(StandardCharsets.UTF_8);
@@ -728,27 +859,163 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     }
 
 
+    private boolean isSpoolmanMaterialId(String materialId) {
+        return materialId != null && materialId.trim().matches("(?i)^SM\\d+$");
+    }
+
+
+    private String cleanAceText(String value) {
+        if (value == null) return "";
+        return value.replace("\u0000", "").trim();
+    }
+
+
+    private String resolveMaterialIDForWrite() {
+        try {
+            if (isSpoolmanMaterialId(selectedSpoolmanMaterialID)) {
+                String lockedId = selectedSpoolmanMaterialID.trim().toUpperCase(Locale.US);
+                if (matDb.getFilamentById(lockedId) != null) {
+                    return lockedId;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return MaterialID;
+    }
+
+
+    private String resolveAceIDForFilament(String writeMaterialID, OpenSpoolFilament osf) {
+        if (isSpoolmanMaterialId(writeMaterialID)) {
+            return writeMaterialID.trim().toUpperCase(Locale.US);
+        }
+
+        String osfId = cleanAceText(osf.getID());
+        if (!osfId.isEmpty()) {
+            return osfId;
+        }
+
+        return String.valueOf(System.currentTimeMillis());
+    }
+
+
+    private void updateTempDisplayFromFilamentJson(JSONObject json) {
+        try {
+            main.extMax.setText(String.format(Locale.getDefault(),"%d°C", json.optInt("max_temp")));
+            main.extMin.setText(String.format(Locale.getDefault(),"%d°C", json.optInt("min_temp")));
+            main.bedMax.setText(String.format(Locale.getDefault(),"%d°C", json.optInt("bed_max_temp")));
+            main.bedMin.setText(String.format(Locale.getDefault(),"%d°C", json.optInt("bed_min_temp")));
+        } catch (Exception ignored) {
+        }
+    }
+
+
+    private void updateTempDisplayFromMaterialId(String materialId) {
+        try {
+            Filament filament = matDb.getFilamentById(materialId);
+            if (filament == null) return;
+            JSONObject json = new JSONObject(filament.filamentParam);
+            updateTempDisplayFromFilamentJson(json);
+        } catch (Exception ignored) {
+        }
+    }
+
+
+    private void writeNtagPage(NfcA nfcA, int page, byte[] fourBytes) throws Exception {
+        if (fourBytes == null || fourBytes.length != 4) {
+            throw new IllegalArgumentException("NTAG page writes require exactly 4 bytes");
+        }
+
+        nfcA.transceive(new byte[]{
+                (byte) 0xA2,
+                (byte) page,
+                fourBytes[0],
+                fourBytes[1],
+                fourBytes[2],
+                fourBytes[3]
+        });
+    }
+
+
+    private void writeAceIdField(NfcA nfcA, String id) throws Exception {
+        byte[] field = new byte[20];
+
+        if (id != null) {
+            byte[] source = id.trim().getBytes(StandardCharsets.UTF_8);
+            System.arraycopy(source, 0, field, 0, Math.min(source.length, field.length));
+        }
+
+        for (int i = 0; i < 5; i++) {
+            writeNtagPage(nfcA, 33 + i, Arrays.copyOfRange(field, i * 4, i * 4 + 4));
+        }
+    }
+
+
+    private String readAceIdField(NfcA nfcA) throws Exception {
+        byte[] field = new byte[20];
+
+        byte[] firstBlock = nfcA.transceive(new byte[]{0x30, (byte) 33});
+        if (firstBlock == null || firstBlock.length < 16) {
+            throw new Exception("Unable to read ACE ID block at page 33");
+        }
+        System.arraycopy(firstBlock, 0, field, 0, 16);
+
+        byte[] secondBlock = nfcA.transceive(new byte[]{0x30, (byte) 37});
+        if (secondBlock == null || secondBlock.length < 4) {
+            throw new Exception("Unable to read ACE ID block at page 37");
+        }
+        System.arraycopy(secondBlock, 0, field, 16, 4);
+
+        return cleanAceText(new String(field, StandardCharsets.UTF_8));
+    }
+
+
     private void writeAceTag(Tag tag) {
         if (tag == null) {
             showToast(R.string.no_nfc_tag_found, Toast.LENGTH_SHORT);
             return;
         }
+
         executorService.execute(() -> {
             NfcA nfcA = NfcA.get(tag);
             if (nfcA != null) {
                 try {
                     if (!nfcA.isConnected()) nfcA.connect();
-                    Filament filament = matDb.getFilamentById(MaterialID);
-                    if (filament == null){
+
+                    String writeMaterialID = resolveMaterialIDForWrite();
+                    Filament filament = matDb.getFilamentById(writeMaterialID);
+                    if (filament == null) {
                         showToast(getString(R.string.filament_not_found_in_db), Toast.LENGTH_SHORT);
                         return;
                     }
+
+                    MaterialID = writeMaterialID;
+
                     OpenSpoolFilament osf = new OpenSpoolFilament(filament.filamentParam);
+
+                    String aceId = resolveAceIDForFilament(writeMaterialID, osf);
+                    if (isSpoolmanMaterialId(aceId)) {
+                        selectedSpoolmanMaterialID = aceId.trim().toUpperCase(Locale.US);
+                    }
+
+                    String aceType = osf.getType();
+                    String aceSubtype = osf.getSubType();
+
+                    if (aceType == null) aceType = "";
+                    if (aceSubtype == null) aceSubtype = "";
+
+                    // Snapmaker Orca only exposes base PLA in the material list.
+                    // For ACE-mod PLA variants such as Basic, Matte, Silk, PLA+, etc.,
+                    // write plain PLA with a blank subtype.
+                    if ("PLA".equalsIgnoreCase(aceType.trim())) {
+                        aceSubtype = "";
+                    }
+
                     byte[] buffer = new byte[144];
+
                     putAtPage(buffer, 4, new byte[]{123, 0, (byte) 229, 0}, 4);
-                    putAtPage(buffer, 5, osf.getBrand().getBytes(StandardCharsets.UTF_8), 20);
-                    putAtPage(buffer, 10, osf.getSubType().getBytes(StandardCharsets.UTF_8), 20);
-                    putAtPage(buffer, 15, osf.getType().getBytes(StandardCharsets.UTF_8), 20);
+                    putAtPage(buffer, 5, aceSubtype.getBytes(StandardCharsets.UTF_8), 20);
+                    putAtPage(buffer, 10, osf.getBrand().getBytes(StandardCharsets.UTF_8), 20);
+                    putAtPage(buffer, 15, aceType.getBytes(StandardCharsets.UTF_8), 20);
                     putAtPage(buffer, 20, formatColor(MaterialColor), 4);
                     //putAtPage(buffer, 21, formatColor(MaterialColor1), 4);
                     //putAtPage(buffer, 22, formatColor(MaterialColor2), 4);
@@ -756,12 +1023,24 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     putAtPage(buffer, 29, doubleLE(osf.getBedMinTemp(), osf.getBedMaxTemp()), 4);
                     putAtPage(buffer, 30, doubleLE(175, GetMaterialLength(main.spoolsize.getSelectedItem().toString())), 4);
                     putAtPage(buffer, 31, new byte[]{(byte) 232, 3, 0, 0}, 4);
-                    putAtPage(buffer, 33, osf.getID().getBytes(StandardCharsets.UTF_8), 20);
+                    putAtPage(buffer, 33, aceId.getBytes(StandardCharsets.UTF_8), 20);
+
                     rawTagWrite(nfcA, 4, buffer, 144);
+
+                    // The normal bulk write should include pages 33-37, but explicitly writing the ID field
+                    // prevents reused tags from keeping a stale Spoolman ID such as SM7.
+                    writeAceIdField(nfcA, aceId);
+
+                    String verifyId = readAceIdField(nfcA);
+                    if (!aceId.equalsIgnoreCase(verifyId)) {
+                        throw new Exception("ACE ID verify failed. Expected " + aceId + " but read " + verifyId);
+                    }
+
                     playBeep();
-                    showToast(R.string.data_written_to_tag, Toast.LENGTH_SHORT);
+                    showToast("Data written to tag: " + verifyId, Toast.LENGTH_SHORT);
+
                 } catch (Exception e) {
-                    showToast(R.string.error_writing_to_tag, Toast.LENGTH_SHORT);
+                    showToast("Error writing tag: " + e.getMessage(), Toast.LENGTH_LONG);
                 } finally {
                     try {
                         if (nfcA.isConnected()) nfcA.close();
@@ -791,14 +1070,24 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                         MaterialColor = String.format("%02X%02X%02X%02X", colorData[0], colorData[3], colorData[2], colorData[1]);
                         byte[] lengthData = rawTagRead(nfcA, 30, 4);
                         String materialWeight = GetMaterialWeight(((lengthData[3] & 0xFF) << 8) | (lengthData[2] & 0xFF));
-                        String materialID = new String(rawTagRead(nfcA, 33, 16), StandardCharsets.UTF_8).trim();
+                        String materialID = readAceIdField(nfcA);
+
+                        if (materialID.isEmpty()) {
+                            showToast("ACE tag has no material ID", Toast.LENGTH_SHORT);
+                            return;
+                        }
+
                         Filament filament = matDb.getFilamentById(materialID);
                         if (filament == null){
-                            showToast(getString(R.string.filament_not_found_in_db), Toast.LENGTH_SHORT);
+                            showToast(getString(R.string.filament_not_found_in_db) + ": " + materialID, Toast.LENGTH_SHORT);
                             return;
                         }
                         OpenSpoolFilament osf = new OpenSpoolFilament(filament.filamentParam);
                         mainHandler.post(() -> {
+                            MaterialID = materialID;
+                            selectedSpoolmanMaterialID = isSpoolmanMaterialId(materialID) ? materialID.trim().toUpperCase(Locale.US) : null;
+
+                            suppressMaterialSelectionCallbacks = true;
                             userSelect = true;
                             setSpinnerSelection(main.brand, osf.getBrand());
                             main.brand.postDelayed(() -> {
@@ -806,7 +1095,13 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                                 main.type.postDelayed(() -> {
                                     try {
                                         setSpinnerSelection(main.subtype, osf.getSubType());
-                                    } catch (Exception ignored) {}
+                                    } catch (Exception ignored) {
+                                    } finally {
+                                        MaterialID = materialID;
+                                        selectedSpoolmanMaterialID = isSpoolmanMaterialId(materialID) ? materialID.trim().toUpperCase(Locale.US) : null;
+                                        suppressMaterialSelectionCallbacks = false;
+                                        userSelect = false;
+                                    }
                                 },200);
                             },200);
 
@@ -815,7 +1110,6 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                             main.colorview.setBackgroundColor(colorInt);
                             main.txtcolor.setText(MaterialColor);
                             main.txtcolor.setTextColor(getContrastColor(colorInt));
-                            userSelect = false;
                         });
                     } else {
                         showToast(R.string.unknown_or_empty_tag, Toast.LENGTH_SHORT);
@@ -924,16 +1218,16 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             gradientBitmap = null;
 
             dl.btncls.setOnClickListener(v -> {
-                    if (dl.txtcolor.getText().toString().length() == 8) {
-                        try {
-                            int color = Color.argb(dl.alphaSlider.getProgress(), dl.redSlider.getProgress(), dl.greenSlider.getProgress(), dl.blueSlider.getProgress());
-                            MaterialColor = dl.txtcolor.getText().toString();
-                            main.colorview.setBackgroundColor(color);
-                            main.txtcolor.setText(MaterialColor);
-                            main.txtcolor.setTextColor(getContrastColor(Color.parseColor("#" + MaterialColor)));
-                        } catch (Exception ignored) {
-                        }
+                if (dl.txtcolor.getText().toString().length() == 8) {
+                    try {
+                        int color = Color.argb(dl.alphaSlider.getProgress(), dl.redSlider.getProgress(), dl.greenSlider.getProgress(), dl.blueSlider.getProgress());
+                        MaterialColor = dl.txtcolor.getText().toString();
+                        main.colorview.setBackgroundColor(color);
+                        main.txtcolor.setText(MaterialColor);
+                        main.txtcolor.setTextColor(getContrastColor(Color.parseColor("#" + MaterialColor)));
+                    } catch (Exception ignored) {
                     }
+                }
 
                 pickerDialog.dismiss();
             });
@@ -1085,30 +1379,30 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 dl.lbltitle.setText(R.string.add_filament);
             }
 
-           dl.btnsave.setOnClickListener(v -> {
-               if (Objects.requireNonNull(dl.txtextmin.getText()).toString().isEmpty() || Objects.requireNonNull(dl.txtextmax.getText()).toString().isEmpty() || Objects.requireNonNull(dl.txtbedmin.getText()).toString().isEmpty() || Objects.requireNonNull(dl.txtbedmax.getText()).toString().isEmpty())
-               {
-                   showToast(R.string.fill_all_fields, Toast.LENGTH_SHORT);
-                   return;
-               }
-               if (dl.chkvendor.isChecked() && Objects.requireNonNull(dl.txtvendor.getText()).toString().isEmpty()) {
-                   showToast(R.string.fill_all_fields, Toast.LENGTH_SHORT);
-                   return;
-               }
+            dl.btnsave.setOnClickListener(v -> {
+                if (Objects.requireNonNull(dl.txtextmin.getText()).toString().isEmpty() || Objects.requireNonNull(dl.txtextmax.getText()).toString().isEmpty() || Objects.requireNonNull(dl.txtbedmin.getText()).toString().isEmpty() || Objects.requireNonNull(dl.txtbedmax.getText()).toString().isEmpty())
+                {
+                    showToast(R.string.fill_all_fields, Toast.LENGTH_SHORT);
+                    return;
+                }
+                if (dl.chkvendor.isChecked() && Objects.requireNonNull(dl.txtvendor.getText()).toString().isEmpty()) {
+                    showToast(R.string.fill_all_fields, Toast.LENGTH_SHORT);
+                    return;
+                }
 
-               String vendor = dl.vendor.getSelectedItem().toString();
-               if (dl.chkvendor.isChecked())
-               {
-                   vendor = Objects.requireNonNull(dl.txtvendor.getText()).toString().trim();
-               }
-               if (edit) {
-                   updateFilament(vendor, dl.type.getSelectedItem().toString(), dl.subtype.getSelectedItem().toString(), dl.txtextmin.getText().toString(), dl.txtextmax.getText().toString(), dl.txtbedmin.getText().toString(), dl.txtbedmax.getText().toString());
-               } else {
-                   addFilament(vendor, dl.type.getSelectedItem().toString(), dl.subtype.getSelectedItem().toString(), dl.txtextmin.getText().toString(), dl.txtextmax.getText().toString(), dl.txtbedmin.getText().toString(), dl.txtbedmax.getText().toString());
-               }
+                String vendor = dl.vendor.getSelectedItem().toString();
+                if (dl.chkvendor.isChecked())
+                {
+                    vendor = Objects.requireNonNull(dl.txtvendor.getText()).toString().trim();
+                }
+                if (edit) {
+                    updateFilament(vendor, dl.type.getSelectedItem().toString(), dl.subtype.getSelectedItem().toString(), dl.txtextmin.getText().toString(), dl.txtextmax.getText().toString(), dl.txtbedmin.getText().toString(), dl.txtbedmax.getText().toString());
+                } else {
+                    addFilament(vendor, dl.type.getSelectedItem().toString(), dl.subtype.getSelectedItem().toString(), dl.txtextmin.getText().toString(), dl.txtextmax.getText().toString(), dl.txtbedmin.getText().toString(), dl.txtbedmax.getText().toString());
+                }
 
-               addDialog.dismiss();
-           });
+                addDialog.dismiss();
+            });
 
             ArrayAdapter<String> vadapter = new ArrayAdapter<>(this, R.layout.spinner_item, filamentVendors);
             dl.vendor.setAdapter(vadapter);
@@ -1127,14 +1421,14 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             dl.type.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
                 public void onItemSelected(AdapterView<?> parentView, View selectedItemView, int position, long id) {
-                        String selectedType = parentView.getItemAtPosition(position).toString();
-                        FilamentRegistry.FilamentProfile profile = FilamentRegistry.getProfile(selectedType);
-                        dl.txtextmin.setText(String.valueOf(profile.minNozzleTemp));
-                        dl.txtextmax.setText(String.valueOf(profile.maxNozzleTemp));
-                        dl.txtbedmin.setText(String.valueOf(profile.minBedTemp));
-                        dl.txtbedmax.setText(String.valueOf(profile.maxBedTemp));
-                        ArrayAdapter<String> sadapter = new ArrayAdapter<>(parentView.getContext(), R.layout.spinner_item, profile.subtypes);
-                        dl.subtype.setAdapter(sadapter);
+                    String selectedType = parentView.getItemAtPosition(position).toString();
+                    FilamentRegistry.FilamentProfile profile = FilamentRegistry.getProfile(selectedType);
+                    dl.txtextmin.setText(String.valueOf(profile.minNozzleTemp));
+                    dl.txtextmax.setText(String.valueOf(profile.maxNozzleTemp));
+                    dl.txtbedmin.setText(String.valueOf(profile.minBedTemp));
+                    dl.txtbedmax.setText(String.valueOf(profile.maxBedTemp));
+                    ArrayAdapter<String> sadapter = new ArrayAdapter<>(parentView.getContext(), R.layout.spinner_item, profile.subtypes);
+                    dl.subtype.setAdapter(sadapter);
                 }
                 @Override
                 public void onNothingSelected(AdapterView<?> parentView) {}
@@ -1869,6 +2163,688 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         }
     }
 
+    private void showSpoolmanMenu() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this, R.style.AlertDialogTheme);
+        builder.setTitle("Spoolman");
+
+        String[] options = new String[] {
+                "Select existing Spoolman spool",
+                "Create current spool in Spoolman"
+        };
+
+        builder.setItems(options, (dialog, which) -> {
+            if (which == 0) {
+                openSpoolmanSelect();
+            } else {
+                openSpoolAdd();
+            }
+        });
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
+    private void openSpoolmanSelect() {
+        String smHost = GetSetting(context, "smhost", "");
+        int smPort = GetSetting(context, "smport", 7912);
+
+        if (smHost.isEmpty()) {
+            showToast("Set Spoolman host first", Toast.LENGTH_SHORT);
+            return;
+        }
+
+        String baseUrl = "http://" + smHost + ":" + smPort + "/api/v1";
+        String sort = Uri.encode("filament.vendor.name:asc,filament.name:asc");
+        String url = baseUrl + "/spool?allow_archived=false&limit=500&sort=" + sort;
+
+        showToast("Loading Spoolman spools...", Toast.LENGTH_SHORT);
+
+        executorService.execute(() -> {
+            try {
+                String response = performSmRequest(context, url, "GET", null);
+
+                if (response == null || response.isEmpty()) {
+                    showToast("No response from Spoolman", Toast.LENGTH_SHORT);
+                    return;
+                }
+
+                JSONArray spools = new JSONArray(response);
+
+                if (spools.length() == 0) {
+                    showToast("No active Spoolman spools found", Toast.LENGTH_SHORT);
+                    return;
+                }
+
+                ArrayList<JSONObject> spoolObjects = new ArrayList<>();
+
+                for (int i = 0; i < spools.length(); i++) {
+                    spoolObjects.add(spools.getJSONObject(i));
+                }
+
+                mainHandler.post(() -> {
+                    ArrayAdapter<JSONObject> adapter = new ArrayAdapter<JSONObject>(this, android.R.layout.simple_list_item_1, new ArrayList<>(spoolObjects)) {
+                        @NonNull
+                        @Override
+                        public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                            JSONObject spool = getItem(position);
+                            if (spool == null) {
+                                return super.getView(position, convertView, parent);
+                            }
+                            return createSpoolmanSpoolRow(spool);
+                        }
+                    };
+
+                    LinearLayout content = new LinearLayout(MainActivity.this);
+                    content.setOrientation(LinearLayout.VERTICAL);
+                    content.setPadding(28, 16, 28, 0);
+
+                    EditText searchBox = new EditText(MainActivity.this);
+                    searchBox.setSingleLine(true);
+                    searchBox.setHint("Search manufacturer, spool, color, ID...");
+                    searchBox.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.text_main));
+                    searchBox.setHintTextColor(Color.LTGRAY);
+                    searchBox.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+                    content.addView(searchBox, new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                    ));
+
+                    TextView resultCount = new TextView(MainActivity.this);
+                    resultCount.setTextColor(Color.LTGRAY);
+                    resultCount.setTextSize(13);
+                    resultCount.setPadding(0, 12, 0, 10);
+                    resultCount.setText(spoolObjects.size() + " active spools");
+                    content.addView(resultCount, new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                    ));
+
+                    TextView emptyView = new TextView(MainActivity.this);
+                    emptyView.setTextColor(Color.LTGRAY);
+                    emptyView.setTextSize(16);
+                    emptyView.setGravity(Gravity.CENTER);
+                    emptyView.setPadding(24, 48, 24, 48);
+                    emptyView.setText("No matching spools");
+                    content.addView(emptyView, new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                    ));
+
+                    ListView listView = new ListView(MainActivity.this);
+                    listView.setAdapter(adapter);
+                    listView.setDividerHeight(0);
+                    listView.setEmptyView(emptyView);
+
+                    DisplayMetrics metrics = getResources().getDisplayMetrics();
+                    int listHeight = (int) (metrics.heightPixels * 0.58f);
+                    content.addView(listView, new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            listHeight
+                    ));
+
+                    searchBox.addTextChangedListener(new TextWatcher() {
+                        @Override
+                        public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                        }
+
+                        @Override
+                        public void onTextChanged(CharSequence s, int start, int before, int count) {
+                        }
+
+                        @Override
+                        public void afterTextChanged(Editable s) {
+                            String query = s == null ? "" : s.toString();
+
+                            adapter.clear();
+                            for (JSONObject spool : spoolObjects) {
+                                if (spoolmanSpoolMatchesQuery(spool, query)) {
+                                    adapter.add(spool);
+                                }
+                            }
+                            adapter.notifyDataSetChanged();
+
+                            int resultTotal = adapter.getCount();
+                            if (query.trim().isEmpty()) {
+                                resultCount.setText(resultTotal + " active spools");
+                                emptyView.setText("No active Spoolman spools found");
+                            } else {
+                                resultCount.setText(resultTotal + " match" + (resultTotal == 1 ? "" : "es"));
+                                emptyView.setText("No spools match \"" + query.trim() + "\"");
+                            }
+                        }
+                    });
+
+                    AlertDialog.Builder builder = new AlertDialog.Builder(this, R.style.AlertDialogTheme);
+                    builder.setTitle("Select Spoolman Spool");
+                    builder.setView(content);
+                    builder.setNegativeButton(R.string.cancel, (dialog, which) -> dialog.dismiss());
+
+                    AlertDialog dialog = builder.create();
+
+                    listView.setOnItemClickListener((parent, view, position, id) -> {
+                        try {
+                            JSONObject spool = adapter.getItem(position);
+                            if (spool != null) {
+                                applySpoolmanSpool(spool);
+                                dialog.dismiss();
+                            }
+                        } catch (Exception e) {
+                            showToast("Failed to apply Spoolman spool", Toast.LENGTH_SHORT);
+                        }
+                    });
+
+                    dialog.setOnShowListener(d -> {
+                        try {
+                            Window window = dialog.getWindow();
+                            if (window != null) {
+                                window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+                            }
+                            listView.requestFocus();
+                        } catch (Exception ignored) {
+                        }
+                    });
+
+                    dialog.show();
+                });
+
+            } catch (Exception e) {
+                showToast("Failed to read Spoolman: " + e.getMessage(), Toast.LENGTH_LONG);
+            }
+        });
+    }
+
+    private View createSpoolmanSpoolRow(JSONObject spool) {
+        LinearLayout row = new LinearLayout(MainActivity.this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(28, 22, 28, 22);
+
+        try {
+            TextView title = new TextView(MainActivity.this);
+            title.setTextSize(17);
+            title.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.text_main));
+            title.setTypeface(null, android.graphics.Typeface.BOLD);
+            title.setText(formatSpoolmanSpoolTitle(spool));
+
+            TextView subtitle = new TextView(MainActivity.this);
+            subtitle.setTextSize(14);
+            subtitle.setTextColor(Color.LTGRAY);
+            subtitle.setText(formatSpoolmanSpoolSubtitle(spool));
+
+            View divider = new View(MainActivity.this);
+            LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    2
+            );
+            dividerParams.setMargins(0, 18, 0, 0);
+            divider.setLayoutParams(dividerParams);
+            divider.setBackgroundColor(ContextCompat.getColor(MainActivity.this, R.color.primary_brand));
+
+            row.addView(title);
+            row.addView(subtitle);
+            row.addView(divider);
+        } catch (Exception e) {
+            TextView fallback = new TextView(MainActivity.this);
+            fallback.setText(formatSpoolmanSpoolTitle(spool));
+            fallback.setTextSize(16);
+            fallback.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.text_main));
+            row.addView(fallback);
+        }
+
+        return row;
+    }
+
+    private String formatSpoolmanSpoolTitle(JSONObject spool) {
+        try {
+            JSONObject filament = spool.optJSONObject("filament");
+            JSONObject vendor = filament != null ? filament.optJSONObject("vendor") : null;
+
+            String vendorName = vendor != null ? vendor.optString("name", "Unknown") : "Unknown";
+            String filamentName = filament != null ? filament.optString("name", "") : "";
+
+            StringBuilder title = new StringBuilder();
+            title.append("#").append(spool.optInt("id")).append(" - ").append(vendorName);
+
+            if (!filamentName.isEmpty()) {
+                title.append(" ").append(filamentName);
+            }
+
+            return title.toString();
+        } catch (Exception e) {
+            return "#" + spool.optInt("id") + " - Spoolman spool";
+        }
+    }
+
+    private String formatSpoolmanSpoolSubtitle(JSONObject spool) {
+        ArrayList<String> parts = new ArrayList<>();
+
+        try {
+            JSONObject filament = spool.optJSONObject("filament");
+
+            if (filament != null) {
+                String material = filament.optString("material", "");
+                if (!material.isEmpty()) {
+                    parts.add(material);
+                }
+            }
+
+            double remainingWeight = spool.optDouble("remaining_weight", -1);
+            if (remainingWeight >= 0) {
+                parts.add((int) Math.round(remainingWeight) + "g");
+            }
+
+            String color = getSpoolmanPrimaryColor(spool);
+            if (!color.isEmpty()) {
+                parts.add("#" + color);
+            }
+
+            String location = spool.optString("location", "");
+            if (!location.isEmpty()) {
+                parts.add(location);
+            }
+        } catch (Exception ignored) {
+        }
+
+        return String.join("  •  ", parts);
+    }
+
+    private String getSpoolmanPrimaryColor(JSONObject spool) {
+        try {
+            JSONObject filament = spool.optJSONObject("filament");
+            if (filament == null) return "";
+
+            String color = filament.optString("color_hex", "").replace("#", "").trim();
+            if (!color.isEmpty()) {
+                return color.toUpperCase(Locale.US);
+            }
+
+            JSONArray multiColors = filament.optJSONArray("multi_color_hexes");
+            if (multiColors != null && multiColors.length() > 0) {
+                return multiColors.optString(0, "").replace("#", "").trim().toUpperCase(Locale.US);
+            }
+        } catch (Exception ignored) {
+        }
+        return "";
+    }
+
+    private boolean spoolmanSpoolMatchesQuery(JSONObject spool, String query) {
+        String normalizedQuery = normalizeSpoolmanSearchText(query);
+        if (normalizedQuery.isEmpty()) {
+            return true;
+        }
+
+        String searchText = normalizeSpoolmanSearchText(buildSpoolmanSearchText(spool));
+        String[] tokens = normalizedQuery.split("\\s+");
+
+        for (String token : tokens) {
+            if (!token.isEmpty() && !searchText.contains(token)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private String normalizeSpoolmanSearchText(String value) {
+        if (value == null) return "";
+
+        return value
+                .toLowerCase(Locale.US)
+                .replace("#", " ")
+                .replace("-", " ")
+                .replace("_", " ")
+                .replace("/", " ")
+                .replace("\\", " ")
+                .replace("(", " ")
+                .replace(")", " ")
+                .replace("[", " ")
+                .replace("]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private String buildSpoolmanSearchText(JSONObject spool) {
+        StringBuilder sb = new StringBuilder();
+
+        try {
+            int spoolId = spool.optInt("id", -1);
+            if (spoolId >= 0) {
+                sb.append(" ").append(spoolId);
+                sb.append(" #").append(spoolId);
+                sb.append(" SM").append(spoolId);
+            }
+
+            sb.append(" ").append(spool.optString("location", ""));
+            sb.append(" ").append(spool.optString("comment", ""));
+            sb.append(" ").append(spool.optString("lot_nr", ""));
+
+            JSONObject filament = spool.optJSONObject("filament");
+            if (filament != null) {
+                JSONObject vendor = filament.optJSONObject("vendor");
+                if (vendor != null) {
+                    sb.append(" ").append(vendor.optString("name", ""));
+                    sb.append(" ").append(vendor.optString("comment", ""));
+                }
+
+                sb.append(" ").append(filament.optString("name", ""));
+                sb.append(" ").append(filament.optString("material", ""));
+                sb.append(" ").append(filament.optString("comment", ""));
+                sb.append(" ").append(filament.optString("external_id", ""));
+                sb.append(" ").append(filament.optString("article_number", ""));
+
+                String color = filament.optString("color_hex", "").replace("#", "").trim();
+                if (!color.isEmpty()) {
+                    sb.append(" ").append(color);
+                    sb.append(" #").append(color);
+                }
+
+                JSONArray multiColors = filament.optJSONArray("multi_color_hexes");
+                if (multiColors != null) {
+                    for (int i = 0; i < multiColors.length(); i++) {
+                        String multiColor = multiColors.optString(i, "").replace("#", "").trim();
+                        if (!multiColor.isEmpty()) {
+                            sb.append(" ").append(multiColor);
+                            sb.append(" #").append(multiColor);
+                        }
+                    }
+                } else {
+                    String multiColorsText = filament.optString("multi_color_hexes", "");
+                    if (!multiColorsText.isEmpty()) {
+                        sb.append(" ").append(multiColorsText);
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        return sb.toString();
+    }
+
+    private void applySpoolmanSpool(JSONObject spool) throws Exception {
+        JSONObject filamentJson = spool.getJSONObject("filament");
+        JSONObject vendorJson = filamentJson.optJSONObject("vendor");
+
+        int spoolId = spool.getInt("id");
+
+        // Keep this short. The ACE tag stores the ID in a fixed raw field.
+        String localId = ("SM" + spoolId).toUpperCase(Locale.US);
+
+        String brand = vendorJson != null ? vendorJson.optString("name", "Generic") : "Generic";
+
+        String rawMaterial = filamentJson.optString("material", "PLA");
+        String filamentName = filamentJson.optString("name", "");
+
+        String type = normalizeSpoolmanMaterial(rawMaterial, filamentName);
+        String subtype = inferSpoolmanSubtype(filamentJson, rawMaterial, filamentName);
+
+        String colorAarrggbb = spoolmanColorToMaterialColor(filamentJson);
+        int weightGram = getSpoolmanWeightGram(spool, filamentJson);
+        double diameter = filamentJson.optDouble("diameter", 1.75);
+
+        FilamentRegistry.FilamentProfile profile = FilamentRegistry.getProfile(type);
+
+        int maxNozzle = filamentJson.has("settings_extruder_temp") && !filamentJson.isNull("settings_extruder_temp")
+                ? filamentJson.optInt("settings_extruder_temp")
+                : profile.maxNozzleTemp;
+
+        int maxBed = filamentJson.has("settings_bed_temp") && !filamentJson.isNull("settings_bed_temp")
+                ? filamentJson.optInt("settings_bed_temp")
+                : profile.maxBedTemp;
+
+        OpenSpoolFilament osf = new OpenSpoolFilament();
+        osf.setID(localId);
+        osf.setType(brand, type, subtype);
+        osf.setColor(colorAarrggbb.substring(2), colorAarrggbb.substring(0, 2));
+        osf.setPhysicals(diameter, weightGram);
+        osf.setTemps(profile.minNozzleTemp, maxNozzle, profile.minBedTemp, maxBed);
+
+        Filament existing = matDb.getFilamentById(localId);
+
+        int position;
+        if (existing != null) {
+            position = existing.position;
+            matDb.deleteItem(existing);
+        } else {
+            position = matDb.getItemCount();
+        }
+
+        Filament localFilament = new Filament();
+        localFilament.position = position;
+        localFilament.filamentID = localId;
+        localFilament.filamentName = type;
+        localFilament.filamentVendor = brand;
+        localFilament.filamentParam = osf.toString();
+
+        matDb.addItem(localFilament);
+
+        // From this point until the delayed spinner updates finish, keep the exact SM### ID locked.
+        // Brand/type/subtype spinners fire callbacks while their adapters are being rebuilt; those callbacks
+        // must not use broad vendor/material/subtype matching to replace this spool ID.
+        MaterialID = localId;
+        selectedSpoolmanMaterialID = localId;
+        suppressMaterialSelectionCallbacks = true;
+        userSelect = true;
+
+        MaterialColor = colorAarrggbb;
+        MaterialWeight = GetMaterialWeightByInt(weightGram);
+
+        loadMaterials();
+
+        mainHandler.postDelayed(() -> {
+            try {
+                MaterialID = localId;
+                selectedSpoolmanMaterialID = localId;
+                suppressMaterialSelectionCallbacks = true;
+                userSelect = true;
+
+                setSpinnerSelection(main.brand, brand);
+
+                main.brand.postDelayed(() -> {
+                    try {
+                        MaterialID = localId;
+                        selectedSpoolmanMaterialID = localId;
+                        suppressMaterialSelectionCallbacks = true;
+                        userSelect = true;
+
+                        setSpinnerSelection(main.type, type);
+
+                        main.type.postDelayed(() -> {
+                            try {
+                                MaterialID = localId;
+                                selectedSpoolmanMaterialID = localId;
+                                suppressMaterialSelectionCallbacks = true;
+                                userSelect = true;
+
+                                setSpinnerSelection(main.subtype, subtype);
+                                updateTempDisplayFromMaterialId(localId);
+                            } catch (Exception ignored) {
+                            } finally {
+                                MaterialID = localId;
+                                selectedSpoolmanMaterialID = localId;
+                                suppressMaterialSelectionCallbacks = false;
+                                userSelect = false;
+                            }
+                        }, 200);
+
+                    } catch (Exception ignored) {
+                        MaterialID = localId;
+                        selectedSpoolmanMaterialID = localId;
+                        suppressMaterialSelectionCallbacks = false;
+                        userSelect = false;
+                    }
+                }, 200);
+
+                setSpinnerSelection(main.spoolsize, MaterialWeight);
+
+                int colorInt = Color.parseColor("#" + MaterialColor);
+                main.colorview.setBackgroundColor(colorInt);
+                main.txtcolor.setText(MaterialColor);
+                main.txtcolor.setTextColor(getContrastColor(colorInt));
+
+                showToast("Loaded Spoolman spool #" + spoolId + " as " + localId, Toast.LENGTH_SHORT);
+
+            } catch (Exception e) {
+                MaterialID = localId;
+                selectedSpoolmanMaterialID = localId;
+                suppressMaterialSelectionCallbacks = false;
+                userSelect = false;
+                showToast("Loaded spool, but failed to update UI", Toast.LENGTH_SHORT);
+            }
+        }, 300);
+    }
+
+    private String normalizeSpoolmanMaterial(String rawMaterial, String filamentName) {
+        String combined = ((rawMaterial == null ? "" : rawMaterial) + " " + (filamentName == null ? "" : filamentName))
+                .trim()
+                .toUpperCase(Locale.US)
+                .replace("_", "-");
+
+        if (combined.contains("PLA-AERO") || combined.contains("PLA AERO") || combined.contains("AERO")) {
+            return "PLA-AERO";
+        }
+
+        if (combined.contains("PLA-CF") || combined.contains("PLA CF") || combined.contains("CARBON")) {
+            return "PLA-CF";
+        }
+
+        if (combined.contains("PLA")) {
+            return "PLA";
+        }
+
+        if (combined.contains("PETG")) {
+            return "PETG";
+        }
+
+        if (combined.contains("ABS")) {
+            return "ABS";
+        }
+
+        if (combined.contains("ASA")) {
+            return "ASA";
+        }
+
+        if (combined.contains("TPU")) {
+            return "TPU";
+        }
+
+        if (combined.contains("PVA")) {
+            return "PVA";
+        }
+
+        if (combined.contains("PA")) {
+            return "PA";
+        }
+
+        if (rawMaterial != null && !rawMaterial.trim().isEmpty()) {
+            return rawMaterial.trim();
+        }
+
+        return "PLA";
+    }
+
+    private String inferSpoolmanSubtype(JSONObject filamentJson, String rawMaterial, String filamentName) {
+        String explicit = getSpoolmanExtraString(filamentJson, "u1_subtype");
+
+        if (!explicit.isEmpty()) {
+            return explicit;
+        }
+
+        String combined = ((rawMaterial == null ? "" : rawMaterial) + " " + (filamentName == null ? "" : filamentName))
+                .toUpperCase(Locale.US);
+
+        if (combined.contains("MATTE")) return "Matte";
+        if (combined.contains("SILK")) return "Silk";
+        if (combined.contains("BASIC")) return "Basic";
+        if (combined.contains("PLUS") || combined.contains("PLA+")) return "PLA+";
+        if (combined.contains("HIGH SPEED") || combined.contains("HS")) return "High Speed";
+        if (combined.contains("WOOD")) return "Wood";
+        if (combined.contains("MARBLE")) return "Marble";
+        if (combined.contains("METAL")) return "Metal";
+
+        return "Basic";
+    }
+
+    private String getSpoolmanExtraString(JSONObject item, String key) {
+        try {
+            JSONObject extra = item.optJSONObject("extra");
+            if (extra == null || !extra.has(key) || extra.isNull(key)) {
+                return "";
+            }
+
+            String value = extra.optString(key, "").trim();
+
+            // Spoolman extra field values may be JSON-encoded strings.
+            if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+                value = value.substring(1, value.length() - 1);
+            }
+
+            return value.trim();
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private String spoolmanColorToMaterialColor(JSONObject filamentJson) {
+        String hex = filamentJson.optString("color_hex", "");
+
+        if ((hex == null || hex.isEmpty()) && filamentJson.has("multi_color_hexes")) {
+            String multi = filamentJson.optString("multi_color_hexes", "");
+            if (!multi.isEmpty()) {
+                hex = multi.split(",")[0];
+            }
+        }
+
+        if (hex == null) {
+            hex = "";
+        }
+
+        hex = hex.replace("#", "").trim().toUpperCase(Locale.US);
+
+        if (hex.length() >= 8) {
+            // Spoolman color is RRGGBBAA when alpha is present.
+            String rgb = hex.substring(0, 6);
+            String alpha = hex.substring(6, 8);
+            return alpha + rgb;
+        }
+
+        if (hex.length() >= 6) {
+            return "FF" + hex.substring(0, 6);
+        }
+
+        return "FFFFFFFF";
+    }
+
+    private int getSpoolmanWeightGram(JSONObject spoolJson, JSONObject filamentJson) {
+        double weight = -1;
+
+        if (spoolJson.has("remaining_weight") && !spoolJson.isNull("remaining_weight")) {
+            weight = spoolJson.optDouble("remaining_weight", -1);
+        } else if (spoolJson.has("initial_weight") && !spoolJson.isNull("initial_weight")) {
+            weight = spoolJson.optDouble("initial_weight", -1);
+        } else if (filamentJson.has("weight") && !filamentJson.isNull("weight")) {
+            weight = filamentJson.optDouble("weight", -1);
+        }
+
+        if (weight <= 0) {
+            return 1000;
+        }
+
+        int rounded = (int) Math.round(weight);
+
+        // U1-RFID currently only has these fixed size options.
+        int[] allowed = new int[] {1000, 750, 600, 500, 250};
+        int best = 1000;
+        int bestDiff = Integer.MAX_VALUE;
+
+        for (int candidate : allowed) {
+            int diff = Math.abs(candidate - rounded);
+            if (diff < bestDiff) {
+                best = candidate;
+                bestDiff = diff;
+            }
+        }
+
+        return best;
+    }
 
     void openSpoolAdd() {
         spoolDialog = new Dialog(context, R.style.Theme_U1RFID);
@@ -2254,7 +3230,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             type[2].setText(GetSetting(context, "tool3_type", "?"));
             type[3].setText(GetSetting(context, "tool4_type", "?"));
 
-           // startFrameUpdater();
+            // startFrameUpdater();
             for (int i = 0; i < tools.length; i++) {
                 final int index = i;
                 tools[i].setOnClickListener(v -> {
@@ -2330,6 +3306,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                                 return;
                             }
                             OpenSpoolFilament osf = new OpenSpoolFilament(filament.filamentParam);
+                            MaterialID = filament.filamentID;
+                            selectedSpoolmanMaterialID = isSpoolmanMaterialId(MaterialID) ? MaterialID.trim().toUpperCase(Locale.US) : null;
                             userSelect = true;
                             setSpinnerSelection(main.brand, osf.getBrand());
                             main.brand.postDelayed(() -> {
@@ -2357,8 +3335,10 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                             main.colorview.setBackgroundColor(colorInt);
                             main.txtcolor.setText(MaterialColor);
                             main.txtcolor.setTextColor(getContrastColor(colorInt));
+                            suppressMaterialSelectionCallbacks = false;
                             userSelect = false;
                         } catch (Exception ignored) {
+                            suppressMaterialSelectionCallbacks = false;
                             userSelect = false;
                         }
                     });
