@@ -90,6 +90,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -241,8 +242,15 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 builder.setTitle(titleText);
                 builder.setMessage(messageText);
                 builder.setPositiveButton(R.string.delete, (dialog, which) -> {
-                    if (matDb.getFilamentById(MaterialID) != null) {
-                        matDb.deleteItem(matDb.getFilamentById(MaterialID));
+                    Filament doomed = matDb.getFilamentById(MaterialID);
+                    if (doomed != null) {
+                        if (doomed.catalogKey != null) {
+                            CatalogTombstone tombstone = new CatalogTombstone();
+                            tombstone.catalogKey = doomed.catalogKey;
+                            tombstone.revision = FilamentCatalog.REVISION;
+                            matDb.addTombstone(tombstone);
+                        }
+                        matDb.deleteItem(doomed);
                         loadMaterials();
                         dialog.dismiss();
                     }
@@ -340,9 +348,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             rdb = filamentDB.getInstance(this);
             matDb = rdb.matDB();
 
-            if (matDb.getItemCount() == 0) {
-                populateDatabase(matDb);
-            }
+            syncCatalog();
 
             mainHandler.post(() -> {
                 sadapter = new ArrayAdapter<>(this, R.layout.spinner_item, materialWeights);
@@ -477,6 +483,30 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     }
 
 
+    /*
+     * Brings the filament catalogue up to date. A new database is seeded outright;
+     * one written before catalogue tracking existed has its stock rows adopted
+     * first, so an upgrade can tell them apart from the user's own filaments.
+     */
+    void syncCatalog() {
+        try {
+            if (matDb.getItemCount() > 0) FilamentCatalog.adoptUntrackedRows(matDb);
+            FilamentCatalog.sync(matDb, matDb.getCatalogRevision());
+        } catch (Exception ignored) {}
+    }
+
+
+    void resetCatalog() {
+        try {
+            FilamentCatalog.reset(matDb);
+            loadMaterials();
+            showToast(R.string.catalog_reset_done, Toast.LENGTH_SHORT);
+        } catch (Exception ignored) {
+            showToast(R.string.catalog_reset_failed, Toast.LENGTH_SHORT);
+        }
+    }
+
+
     void loadMaterials()
     {
         try {
@@ -507,6 +537,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                                 } catch (Exception ignored) {
                                 }
                             }
+                            Collections.sort(subtypes, String.CASE_INSENSITIVE_ORDER);
                             main.subtype.setAdapter(new ArrayAdapter<>(MainActivity.this, R.layout.spinner_item, subtypes));
                         }
 
@@ -572,17 +603,14 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                             byte[] payload = record.getPayload();
                             String jsonString = new String(payload, StandardCharsets.UTF_8);
                             OpenSpoolFilament filament = new OpenSpoolFilament(jsonString);
+                            filament.applyOpenSpoolTypeMapping();
                             mainHandler.post(() -> {
                                 userSelect = true;
                                 setSpinnerSelection(main.brand, filament.getBrand());
                                 main.brand.postDelayed(() -> {
                                     setSpinnerSelection(main.type, filament.getType());
-                                    main.type.postDelayed(() -> {
-                                        try {
-                                            JSONObject json = new JSONObject(jsonString);
-                                            setSpinnerSelection(main.subtype, json.optString("subtype", "Basic"));
-                                        } catch (Exception ignored) {}
-                                    },200);
+                                    main.type.postDelayed(() ->
+                                            setSpinnerSelection(main.subtype, filament.getSubType()), 200);
                                 }, 200);
 
                                 setSpinnerSelection(main.spoolsize, GetMaterialWeightByInt(filament.getWeight()));
@@ -688,7 +716,10 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             }
             OpenSpoolFilament osf = new OpenSpoolFilament(filament.filamentParam);
             osf.setColor(MaterialColor.substring(2), MaterialColor.substring(0, 2));
-            osf.setPhysicals(175,GetMaterialIntWeight(main.spoolsize.getSelectedItem().toString()));
+            osf.setPhysicals(1.75,GetMaterialIntWeight(main.spoolsize.getSelectedItem().toString()));
+            boolean typeSupported = FilamentRegistry.isOpenSpoolTypeSupported(osf.getType(), osf.getSubType());
+            String writtenType = osf.getType();
+            osf.applyOpenSpoolTypeMapping();
             byte[] payload = osf.toString().getBytes(StandardCharsets.UTF_8);
             NdefRecord jsonRecord = NdefRecord.createMime(getString(R.string.application_json), payload);
             NdefMessage message = new NdefMessage(jsonRecord);
@@ -708,7 +739,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 }
                 ndef.writeNdefMessage(message);
                 if (ndef.isConnected()) ndef.close();
-                showToast(R.string.data_written_to_tag, Toast.LENGTH_SHORT);
+                showWriteResult(typeSupported, writtenType);
                 playBeep();
             } else {
                 NdefFormatable ndefFmt = NdefFormatable.get(tag);
@@ -716,7 +747,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     ndefFmt.connect();
                     ndefFmt.format(message);
                     if (ndefFmt.isConnected()) ndefFmt.close();
-                    showToast(R.string.data_written_to_tag, Toast.LENGTH_SHORT);
+                    showWriteResult(typeSupported, writtenType);
                 } else {
                     showToast(R.string.invalid_tag_type, Toast.LENGTH_SHORT);
                 }
@@ -724,6 +755,18 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
 
         } catch (Exception e) {
             showToast(R.string.error_writing_to_tag, Toast.LENGTH_SHORT);
+        }
+    }
+
+
+    // The tag is written either way, but a type the printer cannot map is worth calling out:
+    // the built-in NDEF parser accepts it while the OpenRFID reader discards the whole tag.
+    private void showWriteResult(boolean typeSupported, String type) {
+        if (typeSupported) {
+            showToast(R.string.data_written_to_tag, Toast.LENGTH_SHORT);
+        } else {
+            showToast(getString(R.string.data_written_to_tag) + "\n"
+                    + getString(R.string.unsupported_filament_type, type), Toast.LENGTH_LONG);
         }
     }
 
@@ -1221,6 +1264,9 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             filament.filamentName = tmpType;
             filament.filamentVendor = tmpVendor;
             filament.filamentParam = osfilament.toString();
+            filament.catalogKey = currentFilament.catalogKey;
+            filament.catalogRevision = currentFilament.catalogRevision;
+            filament.catalogSignature = currentFilament.catalogSignature;
             matDb.deleteItem(currentFilament);
             matDb.addItem(filament);
             loadMaterials();
@@ -2132,6 +2178,27 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         sdl.themeswitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             SaveSetting(context, "enabledm", isChecked);
             setThemeMode(isChecked);
+        });
+        sdl.catalogreset.setOnClickListener(v -> {
+            AlertDialog.Builder builder = new AlertDialog.Builder(context);
+            SpannableString titleText = new SpannableString(getString(R.string.reset_catalog));
+            titleText.setSpan(new ForegroundColorSpan(ContextCompat.getColor(context, R.color.primary_brand)), 0, titleText.length(), 0);
+            SpannableString messageText = new SpannableString(getString(R.string.reset_catalog_confirm));
+            messageText.setSpan(new ForegroundColorSpan(ContextCompat.getColor(context, R.color.text_main)), 0, messageText.length(), 0);
+            builder.setTitle(titleText);
+            builder.setMessage(messageText);
+            builder.setPositiveButton(R.string.reset, (dialog, which) -> {
+                resetCatalog();
+                dialog.dismiss();
+            });
+            builder.setNegativeButton(R.string.cancel, (dialog, which) -> dialog.dismiss());
+            AlertDialog alert = builder.create();
+            alert.show();
+            if (alert.getWindow() != null) {
+                alert.getWindow().setBackgroundDrawableResource(R.color.background_alt);
+                alert.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(ContextCompat.getColor(context, R.color.primary_brand));
+                alert.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(ContextCompat.getColor(context, R.color.primary_brand));
+            }
         });
         sdl.spoolswitch.setChecked(GetSetting(context, "enablesm", false));
         sdl.smhost.setText(GetSetting(context, "smhost", ""));

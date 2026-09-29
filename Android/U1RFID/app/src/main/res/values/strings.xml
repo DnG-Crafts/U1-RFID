@@ -115,6 +115,13 @@
     <string name="tag_is_read_only">Tag is read-only</string>
     <string name="tag_capacity_too_small">Tag capacity too small</string>
     <string name="filament_not_found_in_db">Filament not found in db</string>
+    <string name="unsupported_filament_type">%1$s is not recognised by the printer and may be ignored</string>
+    <string name="reset">Reset</string>
+    <string name="reset_catalog">Reset Filament Catalogue</string>
+    <string name="reset_catalog_desc">Restore the supplied filaments, keeping any you added</string>
+    <string name="reset_catalog_confirm">Supplied filaments will be restored and your edits to them discarded.\n\nFilaments you added yourself are kept.</string>
+    <string name="catalog_reset_done">Filament catalogue reset</string>
+    <string name="catalog_reset_failed">Could not reset the filament catalogue</string>
     <string name="application_json">application/json</string>
     <string name="extended_firmware_url">https://github.com/paxx12/SnapmakerU1-Extended-Firmware</string>
     <string name="extended_firmware_message">You must install the extended firmware to the U1 for RFID tags written by this app to work.\n\nYou can obtain the extended firmware from</string>

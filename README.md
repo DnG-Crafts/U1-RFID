@@ -46,7 +46,7 @@ The tag format is a simple NDEF `application/json` record which is in the <a hre
 "max_temp":220,
 "bed_min_temp":50,
 "bed_max_temp":60,
-"diameter":175,
+"diameter":1.75,
 "weight":1000
 }
 

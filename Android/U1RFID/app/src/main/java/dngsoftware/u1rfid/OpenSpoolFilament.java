@@ -37,6 +37,18 @@ public class OpenSpoolFilament {
         json.put("subtype", subtype);
     }
 
+    // An OpenSpool reader rejects a tag whose type is not a base material name. The picker
+    // only offers base materials, so this now catches legacy data: a filament or a tag still
+    // carrying "PLA+" as its type becomes PLA with the variant at the front of the subtype,
+    // which is the form the catalogue uses.
+    public void applyOpenSpoolTypeMapping() throws JSONException {
+        String variant = FilamentRegistry.getOpenSpoolTypeVariant(getType());
+        if (variant == null) return;
+        String subtype = getSubType();
+        String merged = (subtype.isEmpty() || subtype.equals("Basic")) ? variant : variant + " " + subtype;
+        setType(getBrand(), FilamentRegistry.getOpenSpoolType(getType()), merged);
+    }
+
     public void setColor(String hex, String alpha) throws JSONException {
         json.put("color_hex", hex.replace("#", ""));
         json.put("alpha", alpha);

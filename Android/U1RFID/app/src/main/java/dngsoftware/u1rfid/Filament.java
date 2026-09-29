@@ -31,4 +31,18 @@ public class Filament {
         @ColumnInfo(name = "filament_param")
         public String filamentParam;
 
+        // Set for rows owned by the stock catalogue, null for filaments the user added.
+        @SuppressWarnings("UnusedDeclaration")
+        @ColumnInfo(name = "catalog_key")
+        public String catalogKey;
+
+        @SuppressWarnings("UnusedDeclaration")
+        @ColumnInfo(name = "catalog_revision", defaultValue = "0")
+        public int catalogRevision;
+
+        // Contents as the catalogue last wrote them; differs once the user edits the row.
+        @SuppressWarnings("UnusedDeclaration")
+        @ColumnInfo(name = "catalog_signature")
+        public String catalogSignature;
+
 }

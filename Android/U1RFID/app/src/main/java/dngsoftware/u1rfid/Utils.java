@@ -182,59 +182,15 @@ public class Utils {
         }
         return "1.00";
     }
-
-    public static void populateDatabase(MatDB db) {
-        try {
-            List<OpenSpoolFilament> osfList = new ArrayList<>();
-            addToList(osfList, "Snapmaker", "PLA", "Matte", 190, 220, 50, 60);
-            addToList(osfList, "Snapmaker", "PLA", "SnapSpeed", 210, 230, 50, 60);
-            addToList(osfList, "Snapmaker", "PLA", "Basic", 190, 210, 50, 60);
-            addToList(osfList, "Snapmaker", "PLA", "Support", 180, 200, 50, 60);
-            addToList(osfList, "Snapmaker", "PETG", "Basic", 230, 250, 70, 80);
-            addToList(osfList, "Snapmaker", "PETG", "HF", 240, 260, 70, 80);
-            addToList(osfList, "Snapmaker", "TPU", "95A", 210, 230, 30, 50);
-            addToList(osfList, "Snapmaker", "TPU", "95A HF", 220, 240, 30, 50);
-            addToList(osfList, "Snapmaker", "PVA", "Basic", 180, 200, 50, 60);
-            addToList(osfList, "Snapmaker", "ABS", "Basic", 240, 260, 90, 110);
-            addToList(osfList, "Polymaker", "PLA", "Polylite", 190, 230, 40, 60);
-            addToList(osfList, "Polymaker", "PLA", "PolySonic", 210, 240, 40, 60);
-            addToList(osfList, "Polymaker", "PLA", "PolyTerra", 190, 230, 30, 60);
-            addToList(osfList, "Polymaker", "ABS", "Polylite", 245, 265, 90, 100);
-            addToList(osfList, "Polymaker", "PETG", "Polylite", 230, 240, 70, 80);
-            addToList(osfList, "Generic", "PLA", "Basic", 200, 220, 50, 60);
-            addToList(osfList, "Generic", "PETG", "Basic", 230, 250, 70, 85);
-            addToList(osfList, "Generic", "ABS", "Basic", 230, 260, 100, 110);
-            addToList(osfList, "Generic", "TPU", "95A", 220, 240, 40, 60);
-            addToList(osfList, "Generic", "TPU", "95A HF", 230, 250, 40, 60);
-            addToList(osfList, "Generic", "ASA", "Basic", 240, 260, 100, 110);
-            addToList(osfList, "Generic", "BVOH", "Basic", 190, 210, 50, 60);
-            addToList(osfList, "Generic", "EVA", "Basic", 180, 210, 30, 50);
-            addToList(osfList, "Generic", "HIPS", "Basic", 220, 240, 90, 110);
-            addToList(osfList, "Generic", "PA", "Basic", 260, 290, 80, 100);
-            addToList(osfList, "Generic", "PA", "CF", 270, 300, 80, 100);
-            addToList(osfList, "Generic", "PC", "Basic", 270, 300, 100, 120);
-            addToList(osfList, "Generic", "PCTG", "Basic", 250, 270, 70, 80);
-            addToList(osfList, "Generic", "PE", "Basic", 220, 250, 70, 100);
-            addToList(osfList, "Generic", "PE", "CF", 230, 260, 70, 100);
-            addToList(osfList, "Generic", "PHA", "Basic", 190, 210, 40, 60);
-            addToList(osfList, "Generic", "PLA", "Silk", 205, 225, 50, 60);
-            addToList(osfList, "Generic", "PLA", "CF", 210, 230, 50, 60);
-            addToList(osfList, "Generic", "PVA", "Basic", 190, 210, 50, 60);
-            addToList(osfList, "Generic", "PLA", "Support", 190, 210, 50, 60);
-            for (int i = 0; i < osfList.size(); i++) {
-                OpenSpoolFilament osf = osfList.get(i);
-                Filament dbItem = new Filament();
-                dbItem.position = i;
-                dbItem.filamentVendor = osf.getBrand();
-                dbItem.filamentName = osf.getType();
-                dbItem.filamentID = String.valueOf(i);
-                dbItem.filamentParam = osf.toString();
-                db.addItem(dbItem);
-            }
-        } catch (Exception ignored) {}
-    }
-
     public static Filament findFilament(MatDB db, String targetVendor, String targetType, String targetSubtype) {
+        // The printer reports what the tag carries. An older tag may still name PLA+ as
+        // its type, so fold it the same way a write would to match how the db stores it.
+        String variant = FilamentRegistry.getOpenSpoolTypeVariant(targetType);
+        if (variant != null) {
+            targetSubtype = (targetSubtype == null || targetSubtype.isEmpty() || targetSubtype.equals("Basic"))
+                    ? variant : variant + " " + targetSubtype;
+            targetType = FilamentRegistry.getOpenSpoolType(targetType);
+        }
         List<Filament> allFilaments = db.getAllItems();
         for (Filament filament : allFilaments) {
             try {
@@ -253,19 +209,6 @@ public class Utils {
         }
         return null;
     }
-
-    private static void addToList(List<OpenSpoolFilament> list, String brand, String type, String sub, int minE, int maxE, int minB, int maxB) {
-        try {
-            OpenSpoolFilament f = new OpenSpoolFilament();
-            f.setType(brand, type, sub);
-            f.setTemps(minE, maxE, minB, maxB);
-            f.setPhysicals(1.75, 1000);
-            f.setColor("0000FF", "FF");
-            f.setID(String.valueOf(list.size()));
-            list.add(f);
-        } catch (Exception ignored) {}
-    }
-
     @SuppressWarnings("unchecked")
     public static void setSpinnerSelection(Spinner spinner, String value) {
         ArrayAdapter<String> adapter = (ArrayAdapter<String>) spinner.getAdapter();

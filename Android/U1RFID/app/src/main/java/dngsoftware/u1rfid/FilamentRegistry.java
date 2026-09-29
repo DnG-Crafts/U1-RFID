@@ -15,7 +15,10 @@ public class FilamentRegistry {
             this.maxNozzleTemp = maxNozzle;
             this.minBedTemp = minBed;
             this.maxBedTemp = maxBed;
-            this.subtypes = subtypes;
+            // Listed here by family for editing, shown alphabetically for picking.
+            List<String> sorted = new ArrayList<>(subtypes);
+            Collections.sort(sorted, String.CASE_INSENSITIVE_ORDER);
+            this.subtypes = Collections.unmodifiableList(sorted);
         }
     }
 
@@ -122,8 +125,9 @@ public class FilamentRegistry {
 
 
     public static final String[] filamentTypes = {
-            "ABS", "ASA", "HIPS", "PA", "PC", "PLA", "PLA+", "PVA", "PP", "TPU",
-            "PETG", "BVOH", "PA6", "PAHT", "PPS", "PET", "PCTG", "PEBA", "PBT"
+            "ABS", "ASA", "HIPS", "PA", "PC", "PLA", "PVA", "PP", "TPU",
+            "PETG", "BVOH", "PA6", "PAHT", "PPS", "PET", "PCTG", "PEBA", "PBT",
+            "EVA", "PE", "PHA"
     };
 
 
@@ -132,26 +136,21 @@ public class FilamentRegistry {
     static {
       
         registry.put("PLA", new FilamentProfile(190, 225, 40, 60, Arrays.asList(
-                "Basic", "Silk", "Matte", "Tough", "Wood", "Bamboo",
-                "Cork", "Copper", "Bronze", "Steel", "Marble", "Sparkle", "SnapSpeed", "Polylite",
+                "Basic", "PLA+", "Rapid PLA+", "Support", "Silk", "Matte", "Tough", "Wood", "Bamboo",
+                "Cork", "Copper", "Bronze", "Steel", "Marble", "Sparkle",
+                "SnapSpeed", "Polylite", "PolySonic", "PolyTerra",
                 "Galaxy", "Glow in the Dark", "Rainbow", "Dual Tone", "Tri Color", "Thermochromic", "Translucent",
-                "Photochromic", "CF", "GF", "High Speed", "Lightweight", "Conductive"
+                "Photochromic", "CF", "GF", "High Speed", "PRO", "Lightweight", "Conductive"
         )));
 
-        registry.put("PLA+", new FilamentProfile(190, 225, 40, 60, Arrays.asList(
-                "Basic", "Silk", "Matte", "Tough", "Wood", "Bamboo",
-                "Cork", "Copper", "Bronze", "Steel", "Marble", "Sparkle",
-                "Galaxy", "Glow in the Dark", "Rainbow", "Dual Tone", "Tri Color", "Thermochromic", "Translucent",
-                "Photochromic", "CF", "GF", "High Speed", "Lightweight", "Conductive"
-        )));
 
         registry.put("PETG", new FilamentProfile(230, 255, 70, 90, Arrays.asList(
-                "Basic", "Translucent", "Transparent", "Matte", "CF", "GF",
-                "Flame Retardant", "ESD Safe", "Food Safe", "High Speed"
+                "Basic", "Translucent", "Transparent", "Matte", "Polylite", "CF", "GF",
+                "Flame Retardant", "ESD Safe", "Food Safe", "High Speed", "Rapid", "HF", "PRO"
         )));
 
         registry.put("ABS", new FilamentProfile(230, 270, 90, 110, Arrays.asList(
-                "Basic", "Matte", "Aerosol Smoothable", "CF", "GF",
+                "Basic", "Matte", "Polylite", "Aerosol Smoothable", "CF", "GF",
                 "Kevlar", "ESD Safe", "Flame Retardant", "High Impact"
         )));
         
@@ -160,7 +159,7 @@ public class FilamentRegistry {
         )));
 
         registry.put("TPU", new FilamentProfile(210, 245, 30, 60, Arrays.asList(
-                "Basic", "98A", "95A", "95A HF", "85A", "75A", "Foaming (LW)", "Conductive", "High Speed", "Anti Static"
+                "Basic", "98A", "95A", "95A HF", "Rapid 95A", "85A", "75A", "Foaming (LW)", "Conductive", "High Speed", "Anti Static"
         )));
         
         registry.put("PEBA", new FilamentProfile(220, 250, 30, 50, Arrays.asList(
@@ -188,7 +187,7 @@ public class FilamentRegistry {
         )));
         
         registry.put("PCTG", new FilamentProfile(250, 275, 70, 85, Arrays.asList(
-                "High Clarity", "High Impact", "Chemical Resistant", "Food Safe"
+                "Basic", "High Clarity", "High Impact", "Chemical Resistant", "Food Safe"
         )));
         
         registry.put("PBT", new FilamentProfile(230, 260, 70, 90, Arrays.asList(
@@ -203,20 +202,84 @@ public class FilamentRegistry {
                 "Basic", "Recycled", "GF", "CF"
         )));
 
-        registry.put("PVA", new FilamentProfile(185, 210, 45, 60, List.of(
-                "Soluble"
+        registry.put("PVA", new FilamentProfile(185, 210, 45, 60, Arrays.asList(
+                "Basic", "Soluble"
         )));
         
         registry.put("BVOH", new FilamentProfile(190, 220, 45, 60, Arrays.asList(
-                "Fast Dissolving", "High Adhesion"
+                "Basic", "Fast Dissolving", "High Adhesion"
         )));
         
         registry.put("HIPS", new FilamentProfile(230, 250, 90, 110, Arrays.asList(
-                "Limonene Soluble", "Standard Impact"
+                "Basic", "Limonene Soluble", "Standard Impact"
+        )));
+
+        registry.put("EVA", new FilamentProfile(180, 210, 30, 50, List.of(
+                "Basic"
+        )));
+
+        registry.put("PE", new FilamentProfile(220, 250, 70, 100, Arrays.asList(
+                "Basic", "CF", "GF"
+        )));
+
+        registry.put("PHA", new FilamentProfile(190, 210, 40, 60, List.of(
+                "Basic"
         )));
     }
 
     public static FilamentProfile getProfile(String type) {
         return registry.get(type.toUpperCase());
+    }
+
+
+    // OpenSpool consumers treat "type" as a base material name and reject anything else.
+    // The U1 extended firmware routes tags through OpenRFID, which validates the type
+    // (after folding a CF/GF subtype into it) against this list and drops the whole tag
+    // when it does not match. Kept in sync with OpenRFID src/filament/valid_materials.py.
+    private static final Set<String> openSpoolBaseMaterials = new HashSet<>(Arrays.asList(
+            "ABS", "ABS-CF", "ABS-GF", "ASA", "ASA-CF", "ASA-GF", "ASA-AERO", "BVOH",
+            "CoPE", "EVA", "FLEX", "HIPS", "PA", "PA-CF", "PA-GF", "PA6", "PA6-CF",
+            "PA6-GF", "PA11", "PA11-CF", "PA11-GF", "PA12", "PA12-CF", "PA12-GF",
+            "PAHT", "PAHT-CF", "PAHT-GF", "PC", "PC-ABS", "PC-CF", "PC-PBT", "PCL",
+            "PCTG", "PE", "PE-CF", "PE-GF", "PEI-1010", "PEI-1010-CF", "PEI-1010-GF",
+            "PEI-9085", "PEI-9085-CF", "PEI-9085-GF", "PEEK", "PEEK-CF", "PEEK-GF",
+            "PEKK", "PEKK-CF", "PES", "PET", "PET-CF", "PET-GF", "PETG", "PETG-CF",
+            "PETG-GF", "PHA", "PI", "PLA", "PLA-AERO", "PLA-CF", "POM", "PP", "PP-CF",
+            "PP-GF", "PPA-CF", "PPA-GF", "PPS", "PPS-CF", "PPSU", "PSU", "PVA", "PVB",
+            "PVDF", "SBS", "TPI", "TPU"
+    ));
+
+    // Type names offered by the picker that are variants of a base material rather than
+    // a material of their own. They are written to a tag as the base material, with the
+    // variant name carried over into the subtype so nothing is lost.
+    private static final Map<String, String> openSpoolTypeAliases = new LinkedHashMap<>();
+
+    static {
+        openSpoolTypeAliases.put("PLA+", "PLA");
+    }
+
+    // The base material a tag should carry for the given picker type.
+    public static String getOpenSpoolType(String type) {
+        if (type == null) return null;
+        String alias = openSpoolTypeAliases.get(type);
+        return alias != null ? alias : type;
+    }
+
+    // The variant name to fold into the subtype, or null when the type needs no aliasing.
+    // Only legacy data reaches this now that the picker offers base materials alone.
+    public static String getOpenSpoolTypeVariant(String type) {
+        return type != null && openSpoolTypeAliases.containsKey(type) ? type : null;
+    }
+
+    // Whether a tag written with this type/subtype will survive the printer's type check.
+    // OpenRFID promotes a bare "CF" or "GF" subtype into the type before validating it, so a
+    // valid base material can still be rejected once its subtype is folded in. An aliased
+    // type keeps its variant at the front of the subtype, which stops that promotion.
+    public static boolean isOpenSpoolTypeSupported(String type, String subtype) {
+        String resolved = getOpenSpoolType(type);
+        if (resolved == null) return false;
+        boolean aliased = getOpenSpoolTypeVariant(type) != null;
+        if (!aliased && ("CF".equals(subtype) || "GF".equals(subtype))) resolved = resolved + "-" + subtype;
+        return openSpoolBaseMaterials.contains(resolved);
     }
 }
