@@ -164,6 +164,16 @@
     <string name="spool_created_successfully">Spool created successfully!</string>
     <string name="failed_to_create_spool">Failed to create spool</string>
     <string name="error_creating_spool">Error creating spool</string>
+    <string name="spool_already_recorded">Spool already in Spoolman</string>
+    <string name="add_another_spool">Add another spool</string>
+    <string name="this_tag">(this tag)</string>
+    <string name="tag_uid">Tag %1$s</string>
+    <string name="spool_updated_successfully">Spool updated successfully!</string>
+    <string name="failed_to_update_spool">Failed to update spool</string>
+    <string name="loaded_spool_from_spoolman">Loaded Spoolman spool #%1$d</string>
+    <string name="spoolman_filament">Spoolman Filament</string>
+    <string name="spoolman_closest_colour">Automatic (closest colour)</string>
+    <string name="no_spoolman_filaments">No matching Spoolman filaments</string>
     <string name="selected_tool">Selected Tool</string>
     <string name="select_toolhead">Select Toolhead</string>
     <string name="set">Set</string>
@@ -177,4 +187,43 @@
     <string name="stop">Stop</string>
     <string name="start">Start</string>
     <string name="write_to_u1">Write to U1</string>
+
+    <string name="tag_assigned_to_spool">Tag assigned to spool #%1$d</string>
+    <string name="spoolman">Spoolman</string>
+    <string name="sm_pick_spool">Choose a spool</string>
+    <string name="sm_pick_filament">Match this filament</string>
+    <string name="sm_new_spool">New spool\u2026</string>
+    <string name="search_spools">Search</string>
+    <string name="loading_spools">Loading spools\u2026</string>
+    <string name="no_spoolman_spools">Spoolman has no spools</string>
+    <string name="spool_selected">Spool #%1$d selected</string>
+    <string name="no_local_filament_for">No filament defined here for %1$s</string>
+    <string name="spool_ref">spool #%1$d</string>
+    <string name="no_tag_to_link">No tag in range - nothing was linked to the spool</string>
+    <string name="failed_to_link_tag">Could not link the tag to spool #%1$d</string>
+
+    <plurals name="tag_linked_to_spool">
+        <item quantity="one">Tag linked. Spool #%2$d now holds %1$d tag.</item>
+        <item quantity="other">Tag linked. Spool #%2$d now holds %1$d tags.</item>
+    </plurals>
+
+    <plurals name="tag_already_linked">
+        <item quantity="one">Spool #%2$d already holds this tag, %1$d in all.</item>
+        <item quantity="other">Spool #%2$d already holds this tag, %1$d in all.</item>
+    </plurals>
+
+    <plurals name="assign_tag_to_spool">
+        <item quantity="one">%2$s has %1$d spool on record. Which one is this tag on?</item>
+        <item quantity="other">%2$s has %1$d spools on record. Which one is this tag on?</item>
+    </plurals>
+
+    <plurals name="spool_tag_count">
+        <item quantity="one">%1$d tag</item>
+        <item quantity="other">%1$d tags</item>
+    </plurals>
+
+    <plurals name="spools_already_recorded">
+        <item quantity="one">%1$d spool of %2$s is already recorded. Update it, or add another.</item>
+        <item quantity="other">%1$d spools of %2$s are already recorded. Update one, or add another.</item>
+    </plurals>
 </resources>

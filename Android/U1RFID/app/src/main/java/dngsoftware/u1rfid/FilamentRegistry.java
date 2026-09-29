@@ -219,4 +219,54 @@ public class FilamentRegistry {
     public static FilamentProfile getProfile(String type) {
         return registry.get(type.toUpperCase());
     }
+
+    /*
+     * The subtype a Spoolman filament's name is describing, out of those its type offers.
+     * Spoolman has no subtype field of its own, so matching one of its filaments to one of
+     * ours means reading the grade out of the name: "ELEGOO Rapid PLA+ White" is Rapid PLA+.
+     *
+     * A candidate has to sit on word boundaries, or "PE" matches the middle of "Speed". The
+     * earliest wins rather than the longest, because the grade precedes the colour and some
+     * colours are also grades: "ELEGOO Silk Copper" is Silk in copper, not Copper. Ties go
+     * to the longer, so "Rapid PLA+" beats the "PLA+" starting at the same place.
+     */
+    public static String subtypeFromName(String type, String name) {
+        FilamentProfile profile = getProfile(type);
+        if (profile == null || name == null) return "";
+        String haystack = name.toLowerCase(Locale.ROOT);
+        String best = "";
+        int bestAt = Integer.MAX_VALUE;
+        for (String subtype : profile.subtypes) {
+            String needle = subtype.toLowerCase(Locale.ROOT);
+            for (int at = haystack.indexOf(needle); at >= 0; at = haystack.indexOf(needle, at + 1)) {
+                if (at > 0 && Character.isLetterOrDigit(haystack.charAt(at - 1))) continue;
+                int after = at + needle.length();
+                if (after < haystack.length() && Character.isLetterOrDigit(haystack.charAt(after))) continue;
+                if (at < bestAt || (at == bestAt && subtype.length() > best.length())) {
+                    best = subtype;
+                    bestAt = at;
+                }
+                break;
+            }
+        }
+        return best;
+    }
+
+    /*
+     * Whether Spoolman's material names the same thing as ours. Equal, or equal but for a
+     * trailing run of punctuation, so PLA answers to PLA+ whichever side carries the grade.
+     * The trailing part has to be punctuation: PA must not answer to PAHT.
+     */
+    public static boolean sameMaterial(String ours, String theirs) {
+        if (ours == null || theirs == null) return false;
+        String a = ours.trim(), b = theirs.trim();
+        if (a.equalsIgnoreCase(b)) return true;
+        String longer = a.length() > b.length() ? a : b;
+        String shorter = a.length() > b.length() ? b : a;
+        if (!longer.toLowerCase(Locale.ROOT).startsWith(shorter.toLowerCase(Locale.ROOT))) return false;
+        for (char c : longer.substring(shorter.length()).toCharArray()) {
+            if (Character.isLetterOrDigit(c)) return false;
+        }
+        return true;
+    }
 }
