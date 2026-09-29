@@ -744,11 +744,20 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                         return;
                     }
                     OpenSpoolFilament osf = new OpenSpoolFilament(filament.filamentParam);
+                    /*
+                     * Laid out as ACE-RFID writes it, which is what reads these tags:
+                     * marker 7B 00 65 00, then sku, brand, and the type carrying its grade
+                     * after it, sixteen bytes each. A reader takes the first word of that
+                     * field as the material and the rest as modifiers, so "PLA Silk" and
+                     * "PLA Rapid PLA+" arrive as a PLA with what it is beside it.
+                     */
                     byte[] buffer = new byte[144];
-                    putAtPage(buffer, 4, new byte[]{123, 0, (byte) 229, 0}, 4);
-                    putAtPage(buffer, 5, osf.getBrand().getBytes(StandardCharsets.UTF_8), 20);
-                    putAtPage(buffer, 10, osf.getSubType().getBytes(StandardCharsets.UTF_8), 20);
-                    putAtPage(buffer, 15, osf.getType().getBytes(StandardCharsets.UTF_8), 20);
+                    String aceType = osf.getSubType().isEmpty() || osf.getSubType().equals("Basic")
+                            ? osf.getType() : osf.getType() + " " + osf.getSubType();
+                    putAtPage(buffer, 4, new byte[]{123, 0, ACE_FORMAT_MARKER, 0}, 4);
+                    putAtPage(buffer, 5, osf.getID().getBytes(StandardCharsets.UTF_8), 16);
+                    putAtPage(buffer, 10, osf.getBrand().getBytes(StandardCharsets.UTF_8), 16);
+                    putAtPage(buffer, 15, aceType.getBytes(StandardCharsets.UTF_8), 16);
                     putAtPage(buffer, 20, formatColor(MaterialColor), 4);
                     //putAtPage(buffer, 21, formatColor(MaterialColor1), 4);
                     //putAtPage(buffer, 22, formatColor(MaterialColor2), 4);
@@ -775,6 +784,21 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     }
 
 
+    /*
+     * The ACE format's marker, as ACE-RFID writes it and every reader of these tags looks
+     * for. This app wrote 0xE5 here instead, which no reader accepts, so its ACE tags were
+     * never recognised by anything but itself.
+     */
+    private static final byte ACE_FORMAT_MARKER = 0x65;
+    private static final byte ACE_FORMAT_MARKER_LEGACY = (byte) 0xE5;
+
+    // Tags this app wrote before the marker was corrected still read.
+    private static boolean isAceHeader(byte[] header) {
+        if (header == null || header.length < 4) return false;
+        return header[0] == 123 && header[1] == 0 && header[3] == 0
+                && (header[2] == ACE_FORMAT_MARKER || header[2] == ACE_FORMAT_MARKER_LEGACY);
+    }
+
     private void readAceTag(Tag tag) {
         if (tag == null) {
             showToast(R.string.no_nfc_tag_found, Toast.LENGTH_SHORT);
@@ -786,7 +810,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 try {
                     if (!nfcA.isConnected()) nfcA.connect();
                     byte[] header = rawTagRead(nfcA, 4, 4);
-                    if (Arrays.equals(header, new byte[]{123, 0, (byte)229, 0})) {
+                    if (isAceHeader(header)) {
                         byte[] colorData = rawTagRead(nfcA, 20, 4);
                         MaterialColor = String.format("%02X%02X%02X%02X", colorData[0], colorData[3], colorData[2], colorData[1]);
                         byte[] lengthData = rawTagRead(nfcA, 30, 4);
