@@ -5,6 +5,7 @@ appcompatVersion = "1.6.1"
 constraintlayoutVersion = "2.1.4"
 flexbox = "3.0.0"
 material = "1.12.0"
+okhttp = "4.12.0"
 documentfileVersion = "1.1.0"
 
 [libraries]
@@ -13,6 +14,7 @@ appcompat-v161 = { module = "androidx.appcompat:appcompat", version.ref = "appco
 constraintlayout-v214 = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayoutVersion" }
 flexbox = { module = "com.google.android.flexbox:flexbox", version.ref = "flexbox" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 room-runtime = { group = "androidx.room", name = "room-runtime", version = "2.6.1" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version = "2.6.1" }
 documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "documentfileVersion" }

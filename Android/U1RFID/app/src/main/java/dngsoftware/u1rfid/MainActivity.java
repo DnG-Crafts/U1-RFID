@@ -835,28 +835,59 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     }
 
 
+    /*
+     * An NTAG states its own size: GET_VERSION answers with the storage size byte, and
+     * the one command settles what the tag is without reading anything.
+     *
+     * Asking for a page instead meant asking the largest part's pages first, and a page
+     * beyond the end of the tag is answered with a NACK. The tag then stops talking for
+     * the rest of the tap, so the probes that follow fail whatever the tag is, and every
+     * part smaller than an NTAG216 came back as the NTAG213 the probes fall back to -
+     * which the caller then calls incompatible unless ACE tags are turned on.
+     *
+     * The probes remain for whatever does not answer GET_VERSION, an Ultralight C among
+     * them, now smallest page first: the sequence stops at the first page a tag does not
+     * have, so nothing is asked of a tag after it has been made to NACK.
+     */
     private int getTagType(NfcA nfcA) {
-        if (probePage(nfcA, (byte) 220)) return 216;
-        if (probePage(nfcA, (byte) 125)) return 215;
-        if (probePage(nfcA, (byte) 47)) return 100;
-        return 213;
+        byte[] version = transceiveOnce(nfcA, new byte[]{(byte) 0x60});
+        if (version != null && version.length >= 7) {
+            // Storage size, as the datasheets give it. Read no more than these three:
+            // a part this app has no page map for is better left to the probes.
+            switch (version[6] & 0xFF) {
+                case 0x0F: return 213;
+                case 0x11: return 215;
+                case 0x13: return 216;
+                default: break;
+            }
+        }
+        if (!probePage(nfcA, (byte) 47)) return 213;    // NTAG213 ends at page 44
+        if (!probePage(nfcA, (byte) 125)) return 100;   // Ultralight C ends at page 47
+        if (!probePage(nfcA, (byte) 220)) return 215;   // NTAG215 ends at page 134
+        return 216;
     }
 
 
     private boolean probePage(NfcA nfcA, byte pageNumber) {
+        byte[] result = transceiveOnce(nfcA, new byte[]{(byte) 0x30, pageNumber});
+        return result != null && result.length == 16;
+    }
+
+
+    // One command on a connection of its own. A tag that refuses one drops the
+    // connection with it, so the next command opens its own rather than inherit it.
+    private byte[] transceiveOnce(NfcA nfcA, byte[] command) {
+        if (nfcA == null) return null;
         try {
             if (!nfcA.isConnected()) nfcA.connect();
-            byte[] result = nfcA.transceive(new byte[]{(byte) 0x30, pageNumber});
-            if (result != null && result.length == 16) {
-                return true;
-            }
+            return nfcA.transceive(command);
         } catch (Exception ignored) {
+            return null;
         } finally {
             try {
                 if (nfcA.isConnected()) nfcA.close();
             } catch (Exception ignored) {}
         }
-        return false;
     }
 
 
